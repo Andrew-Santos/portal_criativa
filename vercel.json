@@ -1,14 +1,13 @@
 {
   "version": 2,
   "functions": {
-    "api/claudflare.js": {
+    "api/cloudflare.js": {
       "memory": 1024,
       "maxDuration": 10
     }
   },
   "rewrites": [
-    { "source": "/api/cloudflare/(.*)", "destination": "/api/claudflare" },
-    { "source": "/api/cloudflare", "destination": "/api/claudflare" }
+    { "source": "/api/cloudflare/(.*)", "destination": "/api/cloudflare" },
+    { "source": "/api/cloudflare", "destination": "/api/cloudflare" }
   ]
-
 }
