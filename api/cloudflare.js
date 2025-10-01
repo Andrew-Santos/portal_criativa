@@ -84,7 +84,7 @@ module.exports = async (req, res) => {
     }
 
     // Normalizar URL (remover /api/claudflare se existir)
-    const normalizedUrl = req.url.replace('/api/claudflare', '') || '/';
+    const normalizedUrl = req.url.replace('/api/cloudflare', '') || '/';
 
     // Health check - aceita todas as variações de GET
     if (req.method === 'GET') {
@@ -258,3 +258,4 @@ module.exports = async (req, res) => {
         normalizedUrl: normalizedUrl 
     });
 };
+
