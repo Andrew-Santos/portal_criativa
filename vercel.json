@@ -7,7 +7,8 @@
     }
   },
   "rewrites": [
-    { "source": "/api/claudflare/(.*)", "destination": "/api/claudflare" },
-    { "source": "/api/claudflare", "destination": "/api/claudflare" }
+    { "source": "/api/cloudflare/(.*)", "destination": "/api/claudflare" },
+    { "source": "/api/cloudflare", "destination": "/api/claudflare" }
   ]
+
 }
