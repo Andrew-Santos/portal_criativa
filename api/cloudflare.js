@@ -1,4 +1,4 @@
-// api/claudflare.js - Serverless Function para Vercel
+// api/cloudflare.js - Serverless Function para Vercel
 const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
 const { Readable } = require('stream');
 
@@ -83,7 +83,7 @@ module.exports = async (req, res) => {
         return;
     }
 
-    // Normalizar URL (remover /api/claudflare se existir)
+    // Normalizar URL (remover /api/cloudflare se existir)
     const normalizedUrl = req.url.replace('/api/cloudflare', '') || '/';
 
     // Health check - aceita todas as variações de GET
@@ -258,4 +258,3 @@ module.exports = async (req, res) => {
         normalizedUrl: normalizedUrl 
     });
 };
-
