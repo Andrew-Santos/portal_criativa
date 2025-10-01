@@ -50,15 +50,20 @@ module.exports = async (req, res) => {
         return;
     }
 
-    // Health check - aceita raiz, /health, e query params
-    const urlPath = req.url.split('?')[0]; // Remove query params
-    if (req.method === 'GET' && (urlPath === '/' || urlPath === '' || urlPath.includes('/health'))) {
-        res.status(200).json({ status: 'ok', service: 'Cloudflare R2 API', method: req.method, url: req.url });
-        return;
+    // Normalizar URL (remover /api/claudflare se existir)
+    const normalizedUrl = req.url.replace('/api/claudflare', '') || '/';
+
+    // Health check - aceita todas as variações de GET
+    if (req.method === 'GET') {
+        // Aceita: /, /health
+        if (normalizedUrl === '/' || normalizedUrl.includes('/health')) {
+            res.status(200).json({ status: 'ok', service: 'Cloudflare R2 API', method: req.method, url: req.url });
+            return;
+        }
     }
 
     // Upload único
-    if (req.method === 'POST' && (req.url.includes('/upload') && !req.url.includes('multiple'))) {
+    if (req.method === 'POST' && (normalizedUrl.includes('/upload') && !normalizedUrl.includes('multiple'))) {
         try {
             const { fields, files } = await parseForm(req);
             
@@ -119,9 +124,9 @@ module.exports = async (req, res) => {
     }
 
     // Delete
-    if (req.method === 'DELETE' && req.url.includes('/delete/')) {
+    if (req.method === 'DELETE' && normalizedUrl.includes('/delete/')) {
         try {
-            const fileName = req.url.split('/delete/')[1];
+            const fileName = normalizedUrl.split('/delete/')[1];
 
             const command = new DeleteObjectCommand({
                 Bucket: BUCKET_NAME,
@@ -147,7 +152,7 @@ module.exports = async (req, res) => {
     }
 
     // Delete múltiplo
-    if (req.method === 'POST' && req.url.includes('/delete-multiple')) {
+    if (req.method === 'POST' && normalizedUrl.includes('/delete-multiple')) {
         try {
             const body = JSON.parse(req.body);
             const { fileNames } = body;
