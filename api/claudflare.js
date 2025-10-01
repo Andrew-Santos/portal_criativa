@@ -50,14 +50,15 @@ module.exports = async (req, res) => {
         return;
     }
 
-    // Health check
-    if (req.method === 'GET' && (req.url === '/' || req.url.includes('/health'))) {
+    // Health check - aceita raiz, /health, e query params
+    const urlPath = req.url.split('?')[0]; // Remove query params
+    if (req.method === 'GET' && (urlPath === '/' || urlPath === '' || urlPath.includes('/health'))) {
         res.status(200).json({ status: 'ok', service: 'Cloudflare R2 API', method: req.method, url: req.url });
         return;
     }
 
     // Upload único
-    if (req.method === 'POST' && req.url.includes('/upload') && !req.url.includes('multiple')) {
+    if (req.method === 'POST' && (req.url.includes('/upload') && !req.url.includes('multiple'))) {
         try {
             const { fields, files } = await parseForm(req);
             
