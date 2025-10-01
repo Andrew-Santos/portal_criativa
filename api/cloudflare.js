@@ -1,5 +1,6 @@
-// api/cloudflare.js - Serverless Function para Vercel (CORRIGIDO)
+// api/cloudflare.js - Serverless Function para Vercel com Busboy
 const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
+const Busboy = require('busboy');
 const path = require('path');
 
 // Configuração do Cloudflare R2
@@ -15,76 +16,66 @@ const R2 = new S3Client({
 const BUCKET_NAME = 'criativa';
 const R2_PUBLIC_URL = 'https://49f4ed709618aaf0872d22b7370c4c2f.r2.cloudflarestorage.com/criativa';
 
-// Helper para parsear multipart/form-data manualmente
-const parseMultipartForm = async (req) => {
+// Helper para parsear multipart/form-data com Busboy
+const parseMultipartForm = (req) => {
     return new Promise((resolve, reject) => {
-        let data = [];
-        
-        req.on('data', chunk => {
-            data.push(chunk);
+        const busboy = Busboy({ headers: req.headers });
+        const fields = {};
+        const files = {};
+        const fileBuffers = {};
+
+        busboy.on('field', (fieldname, value) => {
+            fields[fieldname] = value;
         });
-        
+
+        busboy.on('file', (fieldname, file, info) => {
+            const { filename, encoding, mimeType } = info;
+            const chunks = [];
+
+            file.on('data', (chunk) => {
+                chunks.push(chunk);
+            });
+
+            file.on('end', () => {
+                fileBuffers[fieldname] = {
+                    filename: filename,
+                    contentType: mimeType,
+                    data: Buffer.concat(chunks)
+                };
+            });
+        });
+
+        busboy.on('finish', () => {
+            resolve({ fields, files: fileBuffers });
+        });
+
+        busboy.on('error', reject);
+
+        req.pipe(busboy);
+    });
+};
+
+// Helper para ler body de requisições JSON
+const readBody = (req) => {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
         req.on('end', () => {
             try {
-                const buffer = Buffer.concat(data);
-                const boundary = req.headers['content-type'].split('boundary=')[1];
-                
-                if (!boundary) {
-                    reject(new Error('Boundary não encontrado'));
-                    return;
-                }
-                
-                const parts = buffer.toString('binary').split(`--${boundary}`);
-                const files = {};
-                const fields = {};
-                
-                parts.forEach(part => {
-                    if (part.includes('Content-Disposition')) {
-                        const nameMatch = part.match(/name="([^"]+)"/);
-                        const filenameMatch = part.match(/filename="([^"]+)"/);
-                        
-                        if (nameMatch) {
-                            const fieldName = nameMatch[1];
-                            const headerEnd = part.indexOf('\r\n\r\n');
-                            
-                            if (headerEnd !== -1) {
-                                const content = part.substring(headerEnd + 4);
-                                const contentEnd = content.lastIndexOf('\r\n');
-                                const value = content.substring(0, contentEnd);
-                                
-                                if (filenameMatch) {
-                                    // É um arquivo
-                                    const filename = filenameMatch[1];
-                                    const contentTypeMatch = part.match(/Content-Type: ([^\r\n]+)/);
-                                    const contentType = contentTypeMatch ? contentTypeMatch[1] : 'application/octet-stream';
-                                    
-                                    files[fieldName] = {
-                                        filename: filename,
-                                        contentType: contentType,
-                                        data: Buffer.from(value, 'binary')
-                                    };
-                                } else {
-                                    // É um campo de texto
-                                    fields[fieldName] = value;
-                                }
-                            }
-                        }
-                    }
-                });
-                
-                resolve({ fields, files });
-            } catch (error) {
-                reject(error);
+                resolve(JSON.parse(body));
+            } catch (e) {
+                resolve({});
             }
         });
-        
         req.on('error', reject);
     });
 };
 
 module.exports = async (req, res) => {
     // CORS
-    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
@@ -156,7 +147,8 @@ module.exports = async (req, res) => {
             console.error('Erro no upload:', error);
             res.status(500).json({ 
                 error: 'Erro ao fazer upload do arquivo',
-                details: error.message 
+                details: error.message,
+                stack: error.stack
             });
         }
         return;
@@ -167,19 +159,12 @@ module.exports = async (req, res) => {
         try {
             const { fields, files } = await parseMultipartForm(req);
             
-            if (!files.files) {
-                return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-            }
-
             const fileNames = fields.fileNames ? JSON.parse(fields.fileNames) : [];
             const uploadedFiles = [];
 
-            // Se files.files é um array
-            const filesArray = Array.isArray(files.files) ? files.files : [files.files];
-
-            for (let i = 0; i < filesArray.length; i++) {
-                const file = filesArray[i];
-                const fileName = fileNames[i] || file.filename;
+            let index = 0;
+            for (const [fieldname, file] of Object.entries(files)) {
+                const fileName = fileNames[index] || file.filename;
 
                 const ext = path.extname(fileName).toLowerCase();
                 const contentTypeMap = {
@@ -207,6 +192,8 @@ module.exports = async (req, res) => {
                     publicUrl: `${R2_PUBLIC_URL}/${fileName}`,
                     size: file.data.length
                 });
+
+                index++;
             }
 
             res.status(200).json({
@@ -218,7 +205,8 @@ module.exports = async (req, res) => {
             console.error('Erro no upload múltiplo:', error);
             res.status(500).json({ 
                 error: 'Erro ao fazer upload dos arquivos',
-                details: error.message 
+                details: error.message,
+                stack: error.stack
             });
         }
         return;
@@ -247,7 +235,7 @@ module.exports = async (req, res) => {
             console.error('Erro ao deletar arquivo:', error);
             res.status(500).json({ 
                 error: 'Erro ao deletar arquivo',
-                details: error.message 
+                details: error.message
             });
         }
         return;
@@ -256,13 +244,8 @@ module.exports = async (req, res) => {
     // Delete múltiplo
     if (req.method === 'POST' && req.url.includes('/delete-multiple')) {
         try {
-            // Ler body da requisição
-            let body = '';
-            for await (const chunk of req) {
-                body += chunk.toString();
-            }
-            
-            const { fileNames } = JSON.parse(body);
+            const body = await readBody(req);
+            const { fileNames } = body;
 
             if (!fileNames || !Array.isArray(fileNames) || fileNames.length === 0) {
                 return res.status(400).json({ error: 'Lista de arquivos inválida' });
@@ -286,7 +269,7 @@ module.exports = async (req, res) => {
             console.error('Erro ao deletar arquivos:', error);
             res.status(500).json({ 
                 error: 'Erro ao deletar arquivos',
-                details: error.message 
+                details: error.message
             });
         }
         return;
