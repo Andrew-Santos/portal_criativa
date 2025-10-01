@@ -1,7 +1,6 @@
 // api/claudflare.js - Serverless Function para Vercel
 const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
-const multiparty = require('multiparty');
-const path = require('path');
+const { Readable } = require('stream');
 
 // Configuração do Cloudflare R2
 const R2 = new S3Client({
@@ -16,27 +15,61 @@ const R2 = new S3Client({
 const BUCKET_NAME = 'criativa';
 const R2_PUBLIC_URL = 'https://49f4ed709618aaf0872d22b7370c4c2f.r2.cloudflarestorage.com/criativa';
 
-// Parse multipart form data
-const parseForm = (req) => {
-    return new Promise((resolve, reject) => {
-        const form = new multiparty.Form();
-        form.parse(req, (err, fields, files) => {
-            if (err) reject(err);
-            else resolve({ fields, files });
-        });
-    });
-};
+// Parse multipart form data manualmente
+function parseMultipartForm(buffer, boundary) {
+    const parts = [];
+    const boundaryBuffer = Buffer.from('--' + boundary);
+    
+    let start = 0;
+    while (true) {
+        const boundaryIndex = buffer.indexOf(boundaryBuffer, start);
+        if (boundaryIndex === -1) break;
+        
+        const nextBoundaryIndex = buffer.indexOf(boundaryBuffer, boundaryIndex + boundaryBuffer.length);
+        if (nextBoundaryIndex === -1) break;
+        
+        const partData = buffer.slice(boundaryIndex + boundaryBuffer.length, nextBoundaryIndex);
+        
+        // Separar headers do body
+        const headerEndIndex = partData.indexOf(Buffer.from('\r\n\r\n'));
+        if (headerEndIndex === -1) {
+            start = nextBoundaryIndex;
+            continue;
+        }
+        
+        const headersBuffer = partData.slice(0, headerEndIndex);
+        const bodyBuffer = partData.slice(headerEndIndex + 4, partData.length - 2); // Remove \r\n no final
+        
+        const headers = headersBuffer.toString('utf-8');
+        
+        // Extrair name e filename
+        const nameMatch = headers.match(/name="([^"]+)"/);
+        const filenameMatch = headers.match(/filename="([^"]+)"/);
+        
+        if (nameMatch) {
+            parts.push({
+                name: nameMatch[1],
+                filename: filenameMatch ? filenameMatch[1] : null,
+                data: bodyBuffer,
+                isFile: !!filenameMatch
+            });
+        }
+        
+        start = nextBoundaryIndex;
+    }
+    
+    return parts;
+}
 
-// Helper para ler arquivo
-const readFile = (file) => {
+// Helper para ler body como buffer
+async function getRawBody(req) {
     return new Promise((resolve, reject) => {
-        const fs = require('fs');
-        fs.readFile(file.path, (err, data) => {
-            if (err) reject(err);
-            else resolve(data);
-        });
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', reject);
     });
-};
+}
 
 module.exports = async (req, res) => {
     // CORS
@@ -57,7 +90,13 @@ module.exports = async (req, res) => {
     if (req.method === 'GET') {
         // Aceita: /, /health
         if (normalizedUrl === '/' || normalizedUrl.includes('/health')) {
-            res.status(200).json({ status: 'ok', service: 'Cloudflare R2 API', method: req.method, url: req.url });
+            res.status(200).json({ 
+                status: 'ok', 
+                service: 'Cloudflare R2 API', 
+                method: req.method, 
+                url: req.url,
+                normalizedUrl: normalizedUrl 
+            });
             return;
         }
     }
@@ -65,59 +104,84 @@ module.exports = async (req, res) => {
     // Upload único
     if (req.method === 'POST' && (normalizedUrl.includes('/upload') && !normalizedUrl.includes('multiple'))) {
         try {
-            const { fields, files } = await parseForm(req);
+            const contentType = req.headers['content-type'] || '';
             
-            if (!files.file || !files.file[0]) {
-                return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+            if (!contentType.includes('multipart/form-data')) {
+                return res.status(400).json({ 
+                    error: 'Content-Type deve ser multipart/form-data',
+                    received: contentType 
+                });
             }
-
-            const file = files.file[0];
-            const fileName = fields.fileName ? fields.fileName[0] : file.originalFilename;
-
+            
+            // Extrair boundary
+            const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+            if (!boundaryMatch) {
+                return res.status(400).json({ error: 'Boundary não encontrado' });
+            }
+            
+            const boundary = boundaryMatch[1];
+            
+            // Ler body
+            const bodyBuffer = await getRawBody(req);
+            
+            // Parse multipart
+            const parts = parseMultipartForm(bodyBuffer, boundary);
+            
+            // Encontrar arquivo e fileName
+            const filePart = parts.find(p => p.isFile);
+            const fileNamePart = parts.find(p => p.name === 'fileName');
+            
+            if (!filePart) {
+                return res.status(400).json({ 
+                    error: 'Nenhum arquivo enviado',
+                    parts: parts.map(p => ({ name: p.name, isFile: p.isFile }))
+                });
+            }
+            
+            const fileName = fileNamePart ? fileNamePart.data.toString('utf-8') : filePart.filename;
+            
             if (!fileName) {
                 return res.status(400).json({ error: 'Nome do arquivo não fornecido' });
             }
-
-            // Ler o arquivo
-            const fileBuffer = await readFile(file);
-
+            
             // Determinar Content-Type
-            const ext = path.extname(fileName).toLowerCase();
+            const ext = fileName.toLowerCase().match(/\.([^.]+)$/)?.[1];
             const contentTypeMap = {
-                '.jpg': 'image/jpeg',
-                '.jpeg': 'image/jpeg',
-                '.png': 'image/png',
-                '.gif': 'image/gif',
-                '.mp4': 'video/mp4',
-                '.mov': 'video/quicktime',
-                '.avi': 'video/x-msvideo'
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'png': 'image/png',
+                'gif': 'image/gif',
+                'mp4': 'video/mp4',
+                'mov': 'video/quicktime',
+                'avi': 'video/x-msvideo'
             };
-            const contentType = contentTypeMap[ext] || 'application/octet-stream';
-
+            const fileContentType = contentTypeMap[ext] || 'application/octet-stream';
+            
             // Upload para R2
             const command = new PutObjectCommand({
                 Bucket: BUCKET_NAME,
                 Key: fileName,
-                Body: fileBuffer,
-                ContentType: contentType
+                Body: filePart.data,
+                ContentType: fileContentType
             });
-
+            
             await R2.send(command);
-
+            
             const publicUrl = `${R2_PUBLIC_URL}/${fileName}`;
-
+            
             res.status(200).json({
                 success: true,
                 path: fileName,
                 publicUrl: publicUrl,
-                size: file.size
+                size: filePart.data.length
             });
-
+            
         } catch (error) {
             console.error('Erro no upload:', error);
             res.status(500).json({ 
                 error: 'Erro ao fazer upload do arquivo',
-                details: error.message 
+                details: error.message,
+                stack: error.stack
             });
         }
         return;
@@ -154,7 +218,8 @@ module.exports = async (req, res) => {
     // Delete múltiplo
     if (req.method === 'POST' && normalizedUrl.includes('/delete-multiple')) {
         try {
-            const body = JSON.parse(req.body);
+            const bodyBuffer = await getRawBody(req);
+            const body = JSON.parse(bodyBuffer.toString('utf-8'));
             const { fileNames } = body;
 
             if (!fileNames || !Array.isArray(fileNames) || fileNames.length === 0) {
@@ -186,5 +251,10 @@ module.exports = async (req, res) => {
     }
 
     // Rota não encontrada
-    res.status(404).json({ error: 'Rota não encontrada', method: req.method, url: req.url });
+    res.status(404).json({ 
+        error: 'Rota não encontrada', 
+        method: req.method, 
+        url: req.url,
+        normalizedUrl: normalizedUrl 
+    });
 };
