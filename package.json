@@ -2,7 +2,7 @@
   "name": "r2-upload-api",
   "version": "1.0.0",
   "description": "API para gerenciar uploads no Cloudflare R2",
-  "main": "api/claudflare.js",
+  "main": "api/cloudflare.js",
   "scripts": {
     "start": "node server.js",
     "dev": "vercel dev"
@@ -14,3 +14,4 @@
     "@aws-sdk/client-s3": "^3.511.0"
   }
 }
+
