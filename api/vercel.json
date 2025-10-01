@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "functions": {
+    "api/claudflare.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    { "source": "/api/claudflare/(.*)", "destination": "/api/claudflare" },
+    { "source": "/api/claudflare", "destination": "/api/claudflare" }
+  ]
+}
