@@ -1,0 +1,17 @@
+{
+  "name": "r2-upload-api",
+  "version": "1.0.0",
+  "description": "API para gerenciar uploads no Cloudflare R2",
+  "main": "api/claudflare.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "vercel dev"
+  },
+  "keywords": ["cloudflare", "r2", "upload", "api"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.511.0",
+    "multiparty": "^4.2.3"
+  }
+}
