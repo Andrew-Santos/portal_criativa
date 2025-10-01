@@ -14,7 +14,7 @@ const R2 = new S3Client({
 });
 
 const BUCKET_NAME = 'criativa';
-const R2_PUBLIC_URL = 'https://49f4ed709618aaf0872d22b7370c4c2f.r2.cloudflarestorage.com/criativa';
+const R2_PUBLIC_URL = 'https://pub-4371349196374d9dae204ee83a635609.r2.dev';
 
 const parseMultipartForm = (req) => {
     return new Promise((resolve, reject) => {
@@ -338,4 +338,3 @@ module.exports = async (req, res) => {
         url: req.url 
     });
 };
-
