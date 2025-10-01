@@ -8,12 +8,11 @@
   ],
   "routes": [
     {
-      "src": "/api/claudflare/(.*)",
-      "dest": "/server.js"
-    },
-    {
       "src": "/(.*)",
       "dest": "/server.js"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
