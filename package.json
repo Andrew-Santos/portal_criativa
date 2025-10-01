@@ -11,7 +11,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.511.0",
-    "multiparty": "^4.2.3"
+    "@aws-sdk/client-s3": "^3.511.0"
   }
 }
