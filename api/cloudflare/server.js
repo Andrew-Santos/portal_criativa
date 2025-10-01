@@ -1,245 +1,246 @@
-// Configuração do Supabase (apenas banco de dados)
-const SUPABASE_URL = 'https://owpboqevrtthsupugcrt.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93cGJvcWV2cnR0aHN1cHVnY3J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5MjY4MDQsImV4cCI6MjA2OTUwMjgwNH0.7RjkVOUT6ByewP0D6FgHQjZDCoi4GYnGT6BMj794MfQ';
+// server.js - Backend para integração com Cloudflare R2
+// Deploy em: https://portal.teamcriativa.com/api/claudflare
 
-// Inicialização do cliente Supabase
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const express = require('express');
+const multer = require('multer');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
+const cors = require('cors');
+const path = require('path');
+
+const app = express();
+
+// Configuração do CORS - ajuste conforme necessário
+app.use(cors({
+    origin: ['https://portal.teamcriativa.com', 'http://localhost:3000', 'http://127.0.0.1:5500', 'http://localhost:5500'],
+    methods: ['GET', 'POST', 'DELETE'],
+    credentials: true
+}));
+
+app.use(express.json());
+
+// ⚠️ ATENÇÃO: Para teste apenas! Mova para .env em produção
+const R2_ACCESS_KEY_ID = '0955274574591da5706e683d223c2cd2';
+const R2_SECRET_ACCESS_KEY = '2d573aa41d1e0870c6a022caffahc4e370bcba0b553ffbe651b236c62bbd96c6';
 
 // Configuração do Cloudflare R2
-const R2_CONFIG = {
-    API_URL: 'http://localhost:3001', // Para testes locais
-    // API_URL: 'https://portal.teamcriativa.com/api/claudflare', // Para produção
-    PUBLIC_URL: 'https://49f4ed709618aaf0872d22b7370c4c2f.r2.cloudflarestorage.com/criativa'
-};
+const R2 = new S3Client({
+    region: 'auto',
+    endpoint: 'https://49f4ed709618aaf0872d22b7370c4c2f.r2.cloudflarestorage.com',
+    credentials: {
+        accessKeyId: R2_ACCESS_KEY_ID,
+        secretAccessKey: R2_SECRET_ACCESS_KEY
+    }
+});
 
-// Funções para interagir com o banco de dados (Supabase)
-class SupabaseService {
-    // Buscar todos os clientes
-    static async getClients() {
-        try {
-            const { data, error } = await supabase
-                .from('client')
-                .select('*')
-                .order('users', { ascending: true });
-            
-            if (error) throw error;
-            return data;
-        } catch (error) {
-            console.error('Erro ao buscar clientes:', error);
-            return [];
+const BUCKET_NAME = 'criativa';
+const R2_PUBLIC_URL = 'https://49f4ed709618aaf0872d22b7370c4c2f.r2.cloudflarestorage.com/criativa';
+
+// Configuração do Multer para upload em memória
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 100 * 1024 * 1024 // 100MB
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'video/mp4', 'video/quicktime', 'video/x-msvideo'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Tipo de arquivo não suportado'));
         }
     }
+});
 
-    // Buscar cliente por ID
-    static async getClientById(id) {
-        try {
-            const { data, error } = await supabase
-                .from('client')
-                .select('*')
-                .eq('id', id)
-                .single();
-            
-            if (error) throw error;
-            return data;
-        } catch (error) {
-            console.error('Erro ao buscar cliente:', error);
-            return null;
+// Rota de health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', service: 'Cloudflare R2 API' });
+});
+
+// Rota para upload de arquivo
+app.post('/upload', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Nenhum arquivo enviado' });
         }
-    }
 
-    // Criar novo post
-    static async createPost(postData) {
-        try {
-            const { data, error } = await supabase
-                .from('post')
-                .insert([postData])
-                .select()
-                .single();
-            
-            if (error) throw error;
-            return data;
-        } catch (error) {
-            console.error('Erro ao criar post:', error);
-            return null;
+        const { fileName } = req.body;
+        if (!fileName) {
+            return res.status(400).json({ error: 'Nome do arquivo não fornecido' });
         }
-    }
 
-    // Criar mídia do post
-    static async createPostMedia(mediaData) {
-        try {
-            const { data, error } = await supabase
-                .from('post_media')
-                .insert(mediaData)
-                .select();
-            
-            if (error) throw error;
-            return data;
-        } catch (error) {
-            console.error('Erro ao criar mídia do post:', error);
-            return null;
+        // Determinar Content-Type baseado na extensão
+        const ext = path.extname(fileName).toLowerCase();
+        const contentTypeMap = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.mp4': 'video/mp4',
+            '.mov': 'video/quicktime',
+            '.avi': 'video/x-msvideo'
+        };
+        const contentType = contentTypeMap[ext] || req.file.mimetype;
+
+        // Upload para R2
+        const command = new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: fileName,
+            Body: req.file.buffer,
+            ContentType: contentType
+        });
+
+        await R2.send(command);
+
+        // Retornar URL pública
+        const publicUrl = `${R2_PUBLIC_URL}/${fileName}`;
+
+        res.json({
+            success: true,
+            path: fileName,
+            publicUrl: publicUrl,
+            size: req.file.size
+        });
+
+    } catch (error) {
+        console.error('Erro no upload:', error);
+        res.status(500).json({ 
+            error: 'Erro ao fazer upload do arquivo',
+            details: error.message 
+        });
+    }
+});
+
+// Rota para upload múltiplo
+app.post('/upload-multiple', upload.array('files', 10), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: 'Nenhum arquivo enviado' });
         }
-    }
-}
 
-// Serviço para gerenciar uploads no Cloudflare R2
-class R2Service {
-    /**
-     * Upload de arquivo único para R2
-     * @param {File} file - Arquivo a ser enviado
-     * @param {string} fileName - Nome/caminho do arquivo no R2 (ex: "POST/123/arquivo.jpg")
-     * @returns {Promise<Object>} Resultado do upload com URL pública
-     */
-    static async uploadFile(file, fileName) {
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('fileName', fileName);
+        const fileNames = JSON.parse(req.body.fileNames || '[]');
+        if (fileNames.length !== req.files.length) {
+            return res.status(400).json({ error: 'Número de arquivos e nomes não correspondem' });
+        }
 
-            const response = await fetch(`${R2_CONFIG.API_URL}/upload`, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Erro no upload');
-            }
-
-            const data = await response.json();
-            return {
-                path: data.path,
-                publicUrl: data.publicUrl,
-                success: true
+        const uploadPromises = req.files.map(async (file, index) => {
+            const fileName = fileNames[index];
+            const ext = path.extname(fileName).toLowerCase();
+            const contentTypeMap = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.mp4': 'video/mp4',
+                '.mov': 'video/quicktime',
+                '.avi': 'video/x-msvideo'
             };
+            const contentType = contentTypeMap[ext] || file.mimetype;
 
-        } catch (error) {
-            console.error('Erro no upload para R2:', error);
+            const command = new PutObjectCommand({
+                Bucket: BUCKET_NAME,
+                Key: fileName,
+                Body: file.buffer,
+                ContentType: contentType
+            });
+
+            await R2.send(command);
+
             return {
-                success: false,
-                error: error.message
+                fileName: fileName,
+                publicUrl: `${R2_PUBLIC_URL}/${fileName}`,
+                size: file.size
             };
-        }
+        });
+
+        const results = await Promise.all(uploadPromises);
+
+        res.json({
+            success: true,
+            files: results
+        });
+
+    } catch (error) {
+        console.error('Erro no upload múltiplo:', error);
+        res.status(500).json({ 
+            error: 'Erro ao fazer upload dos arquivos',
+            details: error.message 
+        });
     }
+});
 
-    /**
-     * Upload de múltiplos arquivos para R2
-     * @param {Array<{file: File, fileName: string}>} files - Array de objetos com file e fileName
-     * @returns {Promise<Array>} Array com resultados dos uploads
-     */
-    static async uploadMultipleFiles(files) {
-        try {
-            const formData = new FormData();
-            const fileNames = [];
+// Rota para deletar arquivo
+app.delete('/delete/:fileName(*)', async (req, res) => {
+    try {
+        const fileName = req.params.fileName;
 
-            files.forEach(({ file, fileName }) => {
-                formData.append('files', file);
-                fileNames.push(fileName);
-            });
+        const command = new DeleteObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: fileName
+        });
 
-            formData.append('fileNames', JSON.stringify(fileNames));
+        await R2.send(command);
 
-            const response = await fetch(`${R2_CONFIG.API_URL}/upload-multiple`, {
-                method: 'POST',
-                body: formData
-            });
+        res.json({
+            success: true,
+            message: 'Arquivo deletado com sucesso',
+            fileName: fileName
+        });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Erro no upload múltiplo');
+    } catch (error) {
+        console.error('Erro ao deletar arquivo:', error);
+        res.status(500).json({ 
+            error: 'Erro ao deletar arquivo',
+            details: error.message 
+        });
+    }
+});
+
+// Rota para deletar múltiplos arquivos
+app.post('/delete-multiple', async (req, res) => {
+    try {
+        const { fileNames } = req.body;
+
+        if (!fileNames || !Array.isArray(fileNames) || fileNames.length === 0) {
+            return res.status(400).json({ error: 'Lista de arquivos inválida' });
+        }
+
+        const command = new DeleteObjectsCommand({
+            Bucket: BUCKET_NAME,
+            Delete: {
+                Objects: fileNames.map(fileName => ({ Key: fileName }))
             }
+        });
 
-            const data = await response.json();
-            return data.files;
+        await R2.send(command);
 
-        } catch (error) {
-            console.error('Erro no upload múltiplo para R2:', error);
-            throw error;
+        res.json({
+            success: true,
+            message: `${fileNames.length} arquivo(s) deletado(s) com sucesso`
+        });
+
+    } catch (error) {
+        console.error('Erro ao deletar arquivos:', error);
+        res.status(500).json({ 
+            error: 'Erro ao deletar arquivos',
+            details: error.message 
+        });
+    }
+});
+
+// Tratamento de erros do Multer
+app.use((error, req, res, next) => {
+    if (error instanceof multer.MulterError) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'Arquivo muito grande (máximo 100MB)' });
         }
+        return res.status(400).json({ error: error.message });
     }
+    next(error);
+});
 
-    /**
-     * Deletar arquivo do R2
-     * @param {string} fileName - Nome/caminho do arquivo no R2
-     * @returns {Promise<boolean>} Sucesso da operação
-     */
-    static async deleteFile(fileName) {
-        try {
-            const response = await fetch(`${R2_CONFIG.API_URL}/delete/${encodeURIComponent(fileName)}`, {
-                method: 'DELETE'
-            });
+const PORT = process.env.PORT || 3001;
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Erro ao deletar arquivo');
-            }
-
-            return true;
-
-        } catch (error) {
-            console.error('Erro ao deletar arquivo do R2:', error);
-            return false;
-        }
-    }
-
-    /**
-     * Deletar múltiplos arquivos do R2
-     * @param {Array<string>} fileNames - Array com nomes/caminhos dos arquivos
-     * @returns {Promise<boolean>} Sucesso da operação
-     */
-    static async deleteMultipleFiles(fileNames) {
-        try {
-            const response = await fetch(`${R2_CONFIG.API_URL}/delete-multiple`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ fileNames })
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Erro ao deletar arquivos');
-            }
-
-            return true;
-
-        } catch (error) {
-            console.error('Erro ao deletar arquivos do R2:', error);
-            return false;
-        }
-    }
-
-    /**
-     * Obter URL pública de um arquivo
-     * @param {string} fileName - Nome/caminho do arquivo no R2
-     * @returns {string} URL pública do arquivo
-     */
-    static getPublicUrl(fileName) {
-        return `${R2_CONFIG.PUBLIC_URL}/${fileName}`;
-    }
-
-    /**
-     * Verificar status da API
-     * @returns {Promise<boolean>} Status da API
-     */
-    static async checkHealth() {
-        try {
-            const response = await fetch(`${R2_CONFIG.API_URL}/health`);
-            return response.ok;
-        } catch (error) {
-            console.error('API R2 não está respondendo:', error);
-            return false;
-        }
-    }
-}
-
-// Manter compatibilidade com código antigo (deprecated)
-SupabaseService.uploadFile = async function(file, bucket, fileName) {
-    console.warn('SupabaseService.uploadFile está deprecated. Use R2Service.uploadFile');
-    return await R2Service.uploadFile(file, fileName);
-};
-
-SupabaseService.getPublicUrl = function(bucket, fileName) {
-    console.warn('SupabaseService.getPublicUrl está deprecated. Use R2Service.getPublicUrl');
-    return R2Service.getPublicUrl(fileName);
-};
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
+});
