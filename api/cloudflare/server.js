@@ -18,13 +18,17 @@ app.use(cors({
 
 app.use(express.json());
 
+// ⚠️ ATENÇÃO: Para teste apenas! Mova para .env em produção
+const R2_ACCESS_KEY_ID = '0955274574591da5706e683d223c2cd2';
+const R2_SECRET_ACCESS_KEY = '2d573aa41d1e0870c6a022caffahc4e370bcba0b553ffbe651b236c62bbd96c6';
+
 // Configuração do Cloudflare R2
 const R2 = new S3Client({
     region: 'auto',
     endpoint: 'https://49f4ed709618aaf0872d22b7370c4c2f.r2.cloudflarestorage.com',
     credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID, // Defina nas variáveis de ambiente
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY // Defina nas variáveis de ambiente
+        accessKeyId: R2_ACCESS_KEY_ID,
+        secretAccessKey: R2_SECRET_ACCESS_KEY
     }
 });
 
