@@ -9,7 +9,7 @@ const R2 = new S3Client({
     endpoint: 'https://49f4ed709618aaf0872d22b7370c4c2f.r2.cloudflarestorage.com',
     credentials: {
         accessKeyId: '0955274574591da5706e683d223c2cd2',
-        secretAccessKey: '2d573aa41d1e0870c6a022caffahc4e370bcba0b553ffbe651b236c62bbd96c6'
+        secretAccessKey: 'bb14b0bcde4af05da96322e2164781826871cbef8597526aa63781f24027fea2'
     }
 });
 
