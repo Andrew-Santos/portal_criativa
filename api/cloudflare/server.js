@@ -52,8 +52,16 @@ const upload = multer({
     }
 });
 
-// Rota de health check
+// Rota de health check (raiz e com prefixo)
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', service: 'Cloudflare R2 API', path: req.path });
+});
+
 app.get('/health', (req, res) => {
+    res.json({ status: 'ok', service: 'Cloudflare R2 API' });
+});
+
+app.get('/api/claudflare/health', (req, res) => {
     res.json({ status: 'ok', service: 'Cloudflare R2 API' });
 });
 
@@ -109,6 +117,12 @@ app.post('/upload', upload.single('file'), async (req, res) => {
             details: error.message 
         });
     }
+});
+
+app.post('/api/claudflare/upload', upload.single('file'), async (req, res) => {
+    // Redireciona para a rota principal
+    req.url = '/upload';
+    app.handle(req, res);
 });
 
 // Rota para upload múltiplo
@@ -169,6 +183,11 @@ app.post('/upload-multiple', upload.array('files', 10), async (req, res) => {
     }
 });
 
+app.post('/api/claudflare/upload-multiple', upload.array('files', 10), async (req, res) => {
+    req.url = '/upload-multiple';
+    app.handle(req, res);
+});
+
 // Rota para deletar arquivo
 app.delete('/delete/:fileName(*)', async (req, res) => {
     try {
@@ -194,6 +213,11 @@ app.delete('/delete/:fileName(*)', async (req, res) => {
             details: error.message 
         });
     }
+});
+
+app.delete('/api/claudflare/delete/:fileName(*)', async (req, res) => {
+    req.url = `/delete/${req.params.fileName}`;
+    app.handle(req, res);
 });
 
 // Rota para deletar múltiplos arquivos
@@ -228,6 +252,11 @@ app.post('/delete-multiple', async (req, res) => {
     }
 });
 
+app.post('/api/claudflare/delete-multiple', async (req, res) => {
+    req.url = '/delete-multiple';
+    app.handle(req, res);
+});
+
 // Tratamento de erros do Multer
 app.use((error, req, res, next) => {
     if (error instanceof multer.MulterError) {
@@ -239,8 +268,13 @@ app.use((error, req, res, next) => {
     next(error);
 });
 
-const PORT = process.env.PORT || 3001;
+// Exportar para Vercel
+module.exports = app;
 
-app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
-});
+// Para desenvolvimento local
+if (require.main === module) {
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, () => {
+        console.log(`Servidor rodando na porta ${PORT}`);
+    });
+}
