@@ -1,13 +1,10 @@
-// Backend API para Instagram - Exclusão de Mídias
-// Arquivo: instagram.js
-// URL: https://portal.teamcriativa.com/api/instagram.js
-
-const express = require('express');
-const router = express.Router();
+// Vercel Serverless Function - Instagram API
+// Arquivo: api/instagram.js
+// URL: https://portal.teamcriativa.com/api/instagram
 
 /**
- * POST /api/instagram.js
- * Endpoint para excluir mídia do Instagram
+ * Endpoint para operações do Instagram
+ * POST /api/instagram
  * 
  * Body esperado:
  * {
@@ -16,11 +13,34 @@ const router = express.Router();
  *   "accessToken": "EAA..."
  * }
  */
-router.post('/', async (req, res) => {
+export default async function handler(req, res) {
+    // Configurar CORS
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    );
+
+    // Responder OPTIONS (preflight)
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+
+    // Apenas POST é permitido
+    if (req.method !== 'POST') {
+        return res.status(405).json({
+            success: false,
+            error: 'Método não permitido. Use POST.'
+        });
+    }
+
     try {
         const { action, mediaId, accessToken } = req.body;
 
-        // Validações básicas
+        // Validação da action
         if (!action) {
             return res.status(400).json({
                 success: false,
@@ -31,7 +51,7 @@ router.post('/', async (req, res) => {
         // Roteamento de ações
         switch (action) {
             case 'delete_media':
-                return await handleDeleteMedia(req, res);
+                return await handleDeleteMedia(req, res, mediaId, accessToken);
             
             default:
                 return res.status(400).json({
@@ -48,14 +68,12 @@ router.post('/', async (req, res) => {
             details: error.message
         });
     }
-});
+}
 
 /**
  * Função para excluir mídia do Instagram
  */
-async function handleDeleteMedia(req, res) {
-    const { mediaId, accessToken } = req.body;
-
+async function handleDeleteMedia(req, res, mediaId, accessToken) {
     // Validações
     if (!mediaId) {
         return res.status(400).json({
@@ -102,7 +120,7 @@ async function handleDeleteMedia(req, res) {
         if (result.success === true) {
             console.log(`[Instagram API] Mídia ${mediaId} excluída com sucesso`);
             
-            return res.json({
+            return res.status(200).json({
                 success: true,
                 message: 'Mídia excluída com sucesso do Instagram',
                 mediaId: mediaId
@@ -126,28 +144,4 @@ async function handleDeleteMedia(req, res) {
             details: error.message
         });
     }
-}
-
-// Se estiver usando como módulo
-module.exports = router;
-
-// Se estiver usando como script standalone
-if (require.main === module) {
-    const express = require('express');
-    const cors = require('cors');
-    const app = express();
-    
-    // Middlewares
-    app.use(cors());
-    app.use(express.json());
-    
-    // Rota
-    app.use('/api/instagram.js', router);
-    
-    // Iniciar servidor
-    const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
-        console.log(`[Instagram API] Servidor rodando na porta ${PORT}`);
-        console.log(`[Instagram API] Endpoint: http://localhost:${PORT}/api/instagram.js`);
-    });
 }
