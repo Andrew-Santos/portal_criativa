@@ -1,7 +1,6 @@
-// api/cloudflare.js - Com debug detalhado
-const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
-const Busboy = require('busboy');
-const path = require('path');
+// api/cloudflare.js - Com Presigned URLs
+const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 // Configuração do Cloudflare R2
 const R2 = new S3Client({
@@ -16,63 +15,18 @@ const R2 = new S3Client({
 const BUCKET_NAME = 'criativa';
 const R2_PUBLIC_URL = 'https://pub-4371349196374d9dae204ee83a635609.r2.dev';
 
-const parseMultipartForm = (req) => {
-    return new Promise((resolve, reject) => {
-        try {
-            console.log('Iniciando parse do multipart');
-            console.log('Headers:', JSON.stringify(req.headers));
-            
-            const busboy = Busboy({ headers: req.headers });
-            const fields = {};
-            const files = {};
-
-            busboy.on('field', (fieldname, value) => {
-                console.log(`Campo recebido: ${fieldname} = ${value}`);
-                fields[fieldname] = value;
-            });
-
-            busboy.on('file', (fieldname, file, info) => {
-                console.log(`Arquivo recebido: ${fieldname}`, info);
-                const { filename, mimeType } = info;
-                const chunks = [];
-
-                file.on('data', (chunk) => {
-                    chunks.push(chunk);
-                });
-
-                file.on('end', () => {
-                    const buffer = Buffer.concat(chunks);
-                    console.log(`Arquivo completo: ${filename}, tamanho: ${buffer.length} bytes`);
-                    files[fieldname] = {
-                        filename: filename,
-                        contentType: mimeType,
-                        data: buffer
-                    };
-                });
-
-                file.on('error', (err) => {
-                    console.error('Erro no stream do arquivo:', err);
-                });
-            });
-
-            busboy.on('finish', () => {
-                console.log('Parse concluído. Campos:', Object.keys(fields), 'Arquivos:', Object.keys(files));
-                resolve({ fields, files });
-            });
-
-            busboy.on('error', (err) => {
-                console.error('Erro no busboy:', err);
-                reject(err);
-            });
-
-            req.pipe(busboy);
-            
-        } catch (error) {
-            console.error('Erro ao iniciar busboy:', error);
-            reject(error);
-        }
-    });
+// Tipos de arquivos permitidos
+const ALLOWED_TYPES = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'video/mp4': '.mp4',
+    'video/quicktime': '.mov',
+    'video/x-msvideo': '.avi'
 };
+
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
 const readBody = (req) => {
     return new Promise((resolve, reject) => {
@@ -95,7 +49,6 @@ module.exports = async (req, res) => {
     console.log(`\n=== Nova requisição ===`);
     console.log('Método:', req.method);
     console.log('URL:', req.url);
-    console.log('Content-Type:', req.headers['content-type']);
 
     // CORS
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -114,157 +67,212 @@ module.exports = async (req, res) => {
         console.log('Health check OK');
         res.status(200).json({ 
             status: 'ok', 
-            service: 'Cloudflare R2 API', 
+            service: 'Cloudflare R2 API with Presigned URLs', 
             timestamp: new Date().toISOString() 
         });
         return;
     }
 
-    // Upload único
-    if (req.method === 'POST' && req.url.includes('/upload') && !req.url.includes('multiple')) {
+    // ============================================
+    // NOVO: Gerar Presigned URL para upload único
+    // ============================================
+    if (req.method === 'POST' && req.url.includes('/generate-upload-url')) {
         try {
-            console.log('Iniciando upload único');
-            
-            const { fields, files } = await parseMultipartForm(req);
-            
-            console.log('Parse concluído');
-            console.log('Campos recebidos:', Object.keys(fields));
-            console.log('Arquivos recebidos:', Object.keys(files));
+            console.log('Gerando presigned URL para upload único');
+            const body = await readBody(req);
+            const { fileName, contentType, fileSize } = body;
 
-            if (!files.file) {
-                console.log('Nenhum arquivo "file" encontrado');
+            // Validações
+            if (!fileName) {
+                return res.status(400).json({ error: 'Nome do arquivo não fornecido' });
+            }
+
+            if (!contentType) {
+                return res.status(400).json({ error: 'Tipo de arquivo não fornecido' });
+            }
+
+            if (!ALLOWED_TYPES[contentType]) {
                 return res.status(400).json({ 
-                    error: 'Nenhum arquivo enviado',
-                    availableFields: Object.keys(files)
+                    error: 'Tipo de arquivo não permitido',
+                    allowedTypes: Object.keys(ALLOWED_TYPES)
                 });
             }
 
-            const file = files.file;
-            const fileName = fields.fileName || file.filename;
+            if (fileSize && fileSize > MAX_FILE_SIZE) {
+                return res.status(400).json({ 
+                    error: `Arquivo muito grande. Máximo: ${MAX_FILE_SIZE / 1024 / 1024}MB`
+                });
+            }
 
-            console.log('Nome do arquivo:', fileName);
-            console.log('Tamanho:', file.data.length, 'bytes');
+            console.log('Arquivo:', fileName);
+            console.log('Tipo:', contentType);
+            console.log('Tamanho:', fileSize ? `${(fileSize / 1024 / 1024).toFixed(2)}MB` : 'não informado');
+
+            // Criar comando para upload
+            const command = new PutObjectCommand({
+                Bucket: BUCKET_NAME,
+                Key: fileName,
+                ContentType: contentType
+            });
+
+            // Gerar URL assinada (válida por 15 minutos)
+            const uploadUrl = await getSignedUrl(R2, command, { 
+                expiresIn: 900 
+            });
+
+            console.log('Presigned URL gerada com sucesso');
+
+            res.status(200).json({
+                success: true,
+                uploadUrl: uploadUrl,
+                publicUrl: `${R2_PUBLIC_URL}/${fileName}`,
+                fileName: fileName,
+                expiresIn: 900
+            });
+
+        } catch (error) {
+            console.error('Erro ao gerar presigned URL:', error);
+            res.status(500).json({ 
+                error: 'Erro ao gerar URL de upload',
+                details: error.message
+            });
+        }
+        return;
+    }
+
+    // ============================================
+    // NOVO: Gerar Presigned URLs para múltiplos uploads
+    // ============================================
+    if (req.method === 'POST' && req.url.includes('/generate-upload-urls')) {
+        try {
+            console.log('Gerando presigned URLs para múltiplos uploads');
+            const body = await readBody(req);
+            const { files } = body;
+
+            if (!files || !Array.isArray(files) || files.length === 0) {
+                return res.status(400).json({ error: 'Lista de arquivos inválida' });
+            }
+
+            console.log(`Gerando URLs para ${files.length} arquivo(s)`);
+
+            const uploadUrls = [];
+
+            for (const file of files) {
+                const { fileName, contentType, fileSize } = file;
+
+                // Validações
+                if (!fileName || !contentType) {
+                    return res.status(400).json({ 
+                        error: 'Arquivo inválido',
+                        file: file
+                    });
+                }
+
+                if (!ALLOWED_TYPES[contentType]) {
+                    return res.status(400).json({ 
+                        error: `Tipo de arquivo não permitido: ${contentType}`,
+                        fileName: fileName
+                    });
+                }
+
+                if (fileSize && fileSize > MAX_FILE_SIZE) {
+                    return res.status(400).json({ 
+                        error: `Arquivo muito grande: ${fileName}`,
+                        maxSize: `${MAX_FILE_SIZE / 1024 / 1024}MB`
+                    });
+                }
+
+                // Criar comando para upload
+                const command = new PutObjectCommand({
+                    Bucket: BUCKET_NAME,
+                    Key: fileName,
+                    ContentType: contentType
+                });
+
+                // Gerar URL assinada
+                const uploadUrl = await getSignedUrl(R2, command, { 
+                    expiresIn: 900 
+                });
+
+                uploadUrls.push({
+                    fileName: fileName,
+                    uploadUrl: uploadUrl,
+                    publicUrl: `${R2_PUBLIC_URL}/${fileName}`
+                });
+            }
+
+            console.log(`${uploadUrls.length} presigned URLs geradas com sucesso`);
+
+            res.status(200).json({
+                success: true,
+                files: uploadUrls,
+                expiresIn: 900
+            });
+
+        } catch (error) {
+            console.error('Erro ao gerar presigned URLs múltiplas:', error);
+            res.status(500).json({ 
+                error: 'Erro ao gerar URLs de upload',
+                details: error.message
+            });
+        }
+        return;
+    }
+
+    // ============================================
+    // NOVO: Verificar se arquivo existe no R2
+    // ============================================
+    if (req.method === 'POST' && req.url.includes('/verify-upload')) {
+        try {
+            console.log('Verificando se arquivo existe no R2');
+            const body = await readBody(req);
+            const { fileName } = body;
 
             if (!fileName) {
                 return res.status(400).json({ error: 'Nome do arquivo não fornecido' });
             }
 
-            // Determinar Content-Type
-            const ext = path.extname(fileName).toLowerCase();
-            const contentTypeMap = {
-                '.jpg': 'image/jpeg',
-                '.jpeg': 'image/jpeg',
-                '.png': 'image/png',
-                '.gif': 'image/gif',
-                '.mp4': 'video/mp4',
-                '.mov': 'video/quicktime',
-                '.avi': 'video/x-msvideo'
-            };
-            const contentType = contentTypeMap[ext] || file.contentType || 'application/octet-stream';
-
-            console.log('Content-Type determinado:', contentType);
-            console.log('Iniciando upload para R2...');
-
-            // Upload para R2
-            const command = new PutObjectCommand({
+            const command = new HeadObjectCommand({
                 Bucket: BUCKET_NAME,
-                Key: fileName,
-                Body: file.data,
-                ContentType: contentType
+                Key: fileName
             });
 
-            await R2.send(command);
+            const result = await R2.send(command);
 
-            console.log('Upload para R2 concluído com sucesso');
-
-            const publicUrl = `${R2_PUBLIC_URL}/${fileName}`;
+            console.log('Arquivo verificado:', fileName);
+            console.log('Tamanho:', result.ContentLength, 'bytes');
 
             res.status(200).json({
                 success: true,
-                path: fileName,
-                publicUrl: publicUrl,
-                size: file.data.length
+                exists: true,
+                fileName: fileName,
+                size: result.ContentLength,
+                contentType: result.ContentType,
+                lastModified: result.LastModified
             });
 
         } catch (error) {
-            console.error('=== ERRO NO UPLOAD ===');
-            console.error('Mensagem:', error.message);
-            console.error('Stack:', error.stack);
-            console.error('Tipo:', error.constructor.name);
-            
-            res.status(500).json({ 
-                error: 'Erro ao fazer upload do arquivo',
-                details: error.message,
-                errorType: error.constructor.name,
-                stack: error.stack
-            });
-        }
-        return;
-    }
-
-    // Upload múltiplo
-    if (req.method === 'POST' && req.url.includes('/upload-multiple')) {
-        try {
-            console.log('Iniciando upload múltiplo');
-            const { fields, files } = await parseMultipartForm(req);
-            
-            const fileNames = fields.fileNames ? JSON.parse(fields.fileNames) : [];
-            const uploadedFiles = [];
-
-            let index = 0;
-            for (const [fieldname, file] of Object.entries(files)) {
-                const fileName = fileNames[index] || file.filename;
-                console.log(`Upload arquivo ${index + 1}: ${fileName}`);
-
-                const ext = path.extname(fileName).toLowerCase();
-                const contentTypeMap = {
-                    '.jpg': 'image/jpeg',
-                    '.jpeg': 'image/jpeg',
-                    '.png': 'image/png',
-                    '.gif': 'image/gif',
-                    '.mp4': 'video/mp4',
-                    '.mov': 'video/quicktime',
-                    '.avi': 'video/x-msvideo'
-                };
-                const contentType = contentTypeMap[ext] || file.contentType || 'application/octet-stream';
-
-                const command = new PutObjectCommand({
-                    Bucket: BUCKET_NAME,
-                    Key: fileName,
-                    Body: file.data,
-                    ContentType: contentType
+            if (error.name === 'NotFound') {
+                console.log('Arquivo não encontrado:', error);
+                res.status(404).json({ 
+                    success: false,
+                    exists: false,
+                    error: 'Arquivo não encontrado'
                 });
-
-                await R2.send(command);
-
-                uploadedFiles.push({
-                    path: fileName,
-                    publicUrl: `${R2_PUBLIC_URL}/${fileName}`,
-                    size: file.data.length
+            } else {
+                console.error('Erro ao verificar arquivo:', error);
+                res.status(500).json({ 
+                    error: 'Erro ao verificar arquivo',
+                    details: error.message
                 });
-
-                index++;
             }
-
-            console.log(`Upload múltiplo concluído: ${uploadedFiles.length} arquivos`);
-
-            res.status(200).json({
-                success: true,
-                files: uploadedFiles
-            });
-
-        } catch (error) {
-            console.error('Erro no upload múltiplo:', error);
-            res.status(500).json({ 
-                error: 'Erro ao fazer upload dos arquivos',
-                details: error.message,
-                stack: error.stack
-            });
         }
         return;
     }
 
-    // Delete
+    // ============================================
+    // Delete único
+    // ============================================
     if (req.method === 'DELETE' && req.url.includes('/delete/')) {
         try {
             const urlParts = req.url.split('/delete/');
@@ -277,6 +285,8 @@ module.exports = async (req, res) => {
             });
 
             await R2.send(command);
+
+            console.log('Arquivo deletado com sucesso');
 
             res.status(200).json({
                 success: true,
@@ -294,7 +304,9 @@ module.exports = async (req, res) => {
         return;
     }
 
+    // ============================================
     // Delete múltiplo
+    // ============================================
     if (req.method === 'POST' && req.url.includes('/delete-multiple')) {
         try {
             const body = await readBody(req);
@@ -314,6 +326,8 @@ module.exports = async (req, res) => {
             });
 
             await R2.send(command);
+
+            console.log(`${fileNames.length} arquivo(s) deletado(s) com sucesso`);
 
             res.status(200).json({
                 success: true,
@@ -335,6 +349,14 @@ module.exports = async (req, res) => {
     res.status(404).json({ 
         error: 'Rota não encontrada', 
         method: req.method, 
-        url: req.url 
+        url: req.url,
+        availableRoutes: [
+            'POST /generate-upload-url',
+            'POST /generate-upload-urls',
+            'POST /verify-upload',
+            'DELETE /delete/:fileName',
+            'POST /delete-multiple',
+            'GET /health'
+        ]
     });
 };
