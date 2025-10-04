@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#212529">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <title>Painel de Aprovação - Portal Criativa</title>
+    <link rel="shortcut icon" href="https://www.teamcriativa.com/IMAGES/icone.svg" type="image/x-icon">
+
+    <!-- Estilos -->
+    <link rel="stylesheet" href="assets/styles/components/approval-panel.css">
+
+    <!-- Bibliotecas externas (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/phosphor-icons"></script>
+</head>
+<body>
+    <!-- Container principal - será preenchido dinamicamente -->
+    <div id="app-container"></div>
+
+    <!-- Loading inicial -->
+    <div id="initial-loading" class="initial-loading">
+        <div class="loading-spinner"></div>
+        <p>Carregando...</p>
+    </div>
+
+    <!-- Entry point -->
+    <script type="module" src="approval-main.js"></script>
+</body>
+</html>
