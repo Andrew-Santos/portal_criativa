@@ -4,6 +4,7 @@
 import { ApprovalRenderer } from './approval.renderer.js';
 
 export class ApprovalActions {
+    // ... (constructor, init, attachEvents, etc. - Mantenha tudo como estava)
     constructor(panel, authData) {
         this.panel = panel;
         this.authData = authData;
@@ -17,12 +18,18 @@ export class ApprovalActions {
         console.log('[ApprovalActions] Inicializando painel...');
         console.log('[ApprovalActions] IDs dos clientes:', this.clientIds);
         
+        // Renderizar estrutura base
         this.renderer.renderBase();
+        
+        // Carregar aba de aprovação (padrão)
         await this.loadApprovalTab();
+        
+        // Attach eventos
         this.attachEvents();
     }
 
     attachEvents() {
+        // Eventos das tabs
         document.addEventListener('click', (e) => {
             const tab = e.target.closest('[data-tab]');
             if (tab) {
@@ -30,17 +37,20 @@ export class ApprovalActions {
                 this.handleTabClick(tabName);
             }
 
+            // Logout
             const logoutBtn = e.target.closest('#btn-logout');
             if (logoutBtn) {
                 this.handleLogout();
             }
 
+            // Navegação carousel
             const carouselBtn = e.target.closest('.carousel-btn');
             if (carouselBtn) {
                 e.stopPropagation();
                 this.handleCarouselNavigation(carouselBtn);
             }
 
+            // Botões de aprovação
             const approveBtn = e.target.closest('.btn-approve');
             if (approveBtn) {
                 e.stopPropagation();
@@ -53,24 +63,28 @@ export class ApprovalActions {
                 this.handleReject(rejectBtn);
             }
             
+            // --- NOVO: Botões de download ---
             const downloadBtn = e.target.closest('.btn-download');
             if (downloadBtn) {
                 e.stopPropagation();
                 this.handleDownload(downloadBtn);
             }
 
+            // --- NOVO: Botões de compartilhar ---
             const shareBtn = e.target.closest('.btn-compartilhar');
             if (shareBtn) {
                 e.stopPropagation();
                 this.handleShare(shareBtn);
             }
 
+            // Expandir/recolher legenda
             const expandBtn = e.target.closest('.btn-expand-caption');
             if (expandBtn) {
                 e.stopPropagation();
                 this.handleExpandCaption(expandBtn);
             }
 
+            // Toggle de áudio em vídeos
             const video = e.target.closest('.media-video');
             if (video) {
                 e.stopPropagation();
@@ -78,12 +92,14 @@ export class ApprovalActions {
             }
         });
 
+        // Swipe para carousel
         this.attachCarouselSwipeEvents();
     }
 
     handleTabClick(tabName) {
         console.log('[ApprovalActions] Tab clicada:', tabName);
         
+        // Atualizar tab ativa
         document.querySelectorAll('.tab-item').forEach(tab => {
             tab.classList.remove('active');
         });
@@ -91,6 +107,7 @@ export class ApprovalActions {
         
         this.currentTab = tabName;
 
+        // Carregar conteúdo da tab
         switch (tabName) {
             case 'calendario':
                 this.loadCalendarioTab();
@@ -108,6 +125,7 @@ export class ApprovalActions {
         const content = document.getElementById('tab-content');
         if (!content) return;
 
+        // Mostrar loading
         content.innerHTML = `
             <div class="loading-container">
                 <div class="loading-spinner"></div>
@@ -116,13 +134,18 @@ export class ApprovalActions {
         `;
 
         try {
+            // Buscar posts pendentes
             this.posts = await this.fetchPendingPosts();
             
             console.log('[ApprovalActions] Posts pendentes encontrados:', this.posts.length);
 
+            // Renderizar posts
             this.renderer.renderPosts(this.posts);
 
+            // Reattach swipe events após renderização
             setTimeout(() => this.attachCarouselSwipeEvents(), 100);
+
+            // Attach video observers
             this.attachVideoObservers();
 
         } catch (error) {
@@ -218,11 +241,13 @@ export class ApprovalActions {
             newIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
         }
 
+        // Atualizar active
         items.forEach(item => item.classList.remove('active'));
         indicators.forEach(ind => ind.classList.remove('active'));
         items[newIndex].classList.add('active');
         indicators[newIndex].classList.add('active');
 
+        // Pausar vídeos
         items.forEach((item, index) => {
             const video = item.querySelector('video');
             if (video) {
@@ -296,91 +321,94 @@ export class ApprovalActions {
     }
 
     async handleApprove(button) {
-        const postId = button.dataset.postId;
+    const postId = button.dataset.postId;
+    
+    if (!confirm('Deseja aprovar este post?')) return;
+    
+    button.disabled = true;
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<div class="btn-spinner"></div> Aprovando...';
+    
+    try {
+        const now = new Date().toISOString();
         
-        if (!confirm('Deseja aprovar este post?')) return;
+        const { error } = await window.supabaseClient
+            .from('post')
+            .update({
+                status: 'APROVADO',
+                approval_date: now
+            })
+            .eq('id', postId);
         
-        button.disabled = true;
-        const originalHTML = button.innerHTML;
-        button.innerHTML = '<div class="btn-spinner"></div> Aprovando...';
+        if (error) throw error;
         
-        try {
-            const now = new Date().toISOString();
+        console.log('[ApprovalActions] Post aprovado:', postId);
+        
+        // Remover card da lista
+        const card = button.closest('.post-card');
+        card.style.animation = 'fadeOut 0.3s ease';
+        setTimeout(() => {
+            card.remove();
             
-            const { error } = await window.supabaseClient
-                .from('post')
-                .update({
-                    status: 'APROVADO',
-                    approval_date: now
-                })
-                .eq('id', postId);
-            
-            if (error) throw error;
-            
-            console.log('[ApprovalActions] Post aprovado:', postId);
-            
-            const card = button.closest('.post-card');
-            card.style.animation = 'fadeOut 0.3s ease';
-            setTimeout(() => {
-                card.remove();
-                
-                const remaining = document.querySelectorAll('.post-card').length;
-                if (remaining === 0) {
-                    this.renderer.renderPosts([]);
-                }
-            }, 300);
-            
-        } catch (error) {
-            console.error('[ApprovalActions] Erro ao aprovar:', error);
-            alert('Erro ao aprovar post. Tente novamente.');
-            button.disabled = false;
-            button.innerHTML = originalHTML;
-        }
+            // Verificar se ficou vazio
+            const remaining = document.querySelectorAll('.post-card').length;
+            if (remaining === 0) {
+                this.renderer.renderPosts([]);
+            }
+        }, 300);
+        
+    } catch (error) {
+        console.error('[ApprovalActions] Erro ao aprovar:', error);
+        alert('Erro ao aprovar post. Tente novamente.');
+        button.disabled = false;
+        button.innerHTML = originalHTML;
     }
+}
 
-    async handleReject(button) {
-        const postId = button.dataset.postId;
+async handleReject(button) {
+    const postId = button.dataset.postId;
+    
+    if (!confirm('Deseja recusar este post?')) return;
+    
+    button.disabled = true;
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<div class="btn-spinner"></div> Recusando...';
+    
+    try {
+        const now = new Date().toISOString();
         
-        if (!confirm('Deseja recusar este post?')) return;
+        const { error } = await window.supabaseClient
+            .from('post')
+            .update({
+                status: 'REPROVADO',
+                reject_date: now
+            })
+            .eq('id', postId);
         
-        button.disabled = true;
-        const originalHTML = button.innerHTML;
-        button.innerHTML = '<div class="btn-spinner"></div> Recusando...';
+        if (error) throw error;
         
-        try {
-            const now = new Date().toISOString();
+        console.log('[ApprovalActions] Post recusado:', postId);
+        
+        // Remover card da lista
+        const card = button.closest('.post-card');
+        card.style.animation = 'fadeOut 0.3s ease';
+        setTimeout(() => {
+            card.remove();
             
-            const { error } = await window.supabaseClient
-                .from('post')
-                .update({
-                    status: 'REPROVADO',
-                    reject_date: now
-                })
-                .eq('id', postId);
-            
-            if (error) throw error;
-            
-            console.log('[ApprovalActions] Post recusado:', postId);
-            
-            const card = button.closest('.post-card');
-            card.style.animation = 'fadeOut 0.3s ease';
-            setTimeout(() => {
-                card.remove();
-                
-                const remaining = document.querySelectorAll('.post-card').length;
-                if (remaining === 0) {
-                    this.renderer.renderPosts([]);
-                }
-            }, 300);
-            
-        } catch (error) {
-            console.error('[ApprovalActions] Erro ao recusar:', error);
-            alert('Erro ao recusar post. Tente novamente.');
-            button.disabled = false;
-            button.innerHTML = originalHTML;
-        }
+            // Verificar se ficou vazio
+            const remaining = document.querySelectorAll('.post-card').length;
+            if (remaining === 0) {
+                this.renderer.renderPosts([]);
+            }
+        }, 300);
+        
+    } catch (error) {
+        console.error('[ApprovalActions] Erro ao recusar:', error);
+        alert('Erro ao recusar post. Tente novamente.');
+        button.disabled = false;
+        button.innerHTML = originalHTML;
     }
-
+}
     async handleDownload(button) {
         const postId = button.dataset.postId;
         const post = this.posts.find(p => p.id == postId);
@@ -400,6 +428,7 @@ export class ApprovalActions {
             const medias = post.post_media.sort((a, b) => (a.order || 0) - (b.order || 0));
 
             if (medias.length === 1) {
+                // Download único - tenta com fetch, se falhar usa link direto
                 const media = medias[0];
                 const extension = media.type === 'video' ? 'mp4' : 'png';
                 const filename = `post_${postId}_media.${extension}`;
@@ -407,10 +436,11 @@ export class ApprovalActions {
                 try {
                     await this.downloadMediaAsBlob(media.url_media, filename);
                 } catch (corsError) {
-                    console.warn('[ApprovalActions] CORS bloqueou, usando download direto');
+                    console.warn('[ApprovalActions] CORS bloqueou fetch, usando download direto');
                     this.downloadDirect(media.url_media, filename);
                 }
             } else {
+                // Múltiplas mídias - tenta ZIP, se falhar faz downloads separados
                 try {
                     await this.downloadMultipleMediasAsZip(medias, postId);
                 } catch (corsError) {
@@ -428,24 +458,31 @@ export class ApprovalActions {
     }
 
     async downloadMediaAsBlob(url, filename) {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Falha ao buscar mídia: ${response.statusText}`);
+        try {
+            // Este fetch agora deve funcionar após a configuração do CORS no servidor
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Falha na rede ao buscar a mídia: ${response.statusText}`);
+            }
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(objectUrl);
+        } catch (error) {
+            console.error(`[ApprovalActions] Erro no fetch de ${url}:`, error);
+            throw error;
         }
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(objectUrl);
     }
 
     async downloadMultipleMediasAsZip(medias, postId) {
         if (typeof JSZip === 'undefined') {
-            throw new Error("JSZip não está carregado");
+            alert('Erro: A biblioteca JSZip não foi carregada.');
+            throw new Error("JSZip não está definido");
         }
 
         const zip = new JSZip();
@@ -464,7 +501,7 @@ export class ApprovalActions {
 
         results.forEach((result, index) => {
             if (result) {
-                const extension = result.type === 'video' ? 'mp4' : 'png';
+                const extension = result.type === 'video' ? 'mp4' : 'png'; // ou jpg
                 const filename = `midia_${String(index + 1).padStart(2, '0')}.${extension}`;
                 zip.file(filename, result.blob);
             }
@@ -476,32 +513,41 @@ export class ApprovalActions {
         a.href = objectUrl;
         a.download = zipFilename;
         document.body.appendChild(a);
-        a.click();
+a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(objectUrl);
     }
 
-    downloadDirect(url, filename) {
+    // --- NOVA FUNÇÃO AUXILIAR PARA DOWNLOAD ÚNICO ---
+    downloadSingleMedia(url, filename) {
         const a = document.createElement('a');
         a.href = url;
         a.download = filename;
         a.target = '_blank';
-        a.rel = 'noopener noreferrer';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
     }
 
-    downloadMultipleDirect(medias, postId) {
-        medias.forEach((media, index) => {
-            setTimeout(() => {
-                const extension = media.type === 'video' ? 'mp4' : 'png';
-                const filename = `post_${postId}_media_${index + 1}.${extension}`;
-                this.downloadDirect(media.url_media, filename);
-            }, index * 500);
-        });
+    // --- NOVA FUNÇÃO AUXILIAR PARA DOWNLOAD MÚLTIPLO ---
+    async downloadMultipleMedias(medias, postId) {
+        if (!confirm(`Baixar ${medias.length} mídias? Cada arquivo será baixado separadamente.`)) {
+            return;
+        }
+        
+        for (let i = 0; i < medias.length; i++) {
+            const media = medias[i];
+            const extension = media.type === 'video' ? 'mp4' : 'jpg';
+            const filename = `post_${postId}_media_${i + 1}.${extension}`;
+            
+            // Delay entre downloads para não sobrecarregar
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            this.downloadSingleMedia(media.url_media, filename);
+        }
     }
 
+    // --- NOVA FUNÇÃO DE COMPARTILHAMENTO ---
     handleShare(button) {
         const postId = button.dataset.postId;
         const post = this.posts.find(p => p.id == postId);
@@ -513,6 +559,7 @@ export class ApprovalActions {
 
         console.log('[ApprovalActions] Preparando links para compartilhar do post:', postId);
 
+        // Monta a string de texto com os links, como solicitado
         let shareText = 'Segue a mídia do portal Criativa\n\n';
         
         const sortedMedias = post.post_media.sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -521,6 +568,7 @@ export class ApprovalActions {
             shareText += `Link ${index + 1}: ${media.url_media}\n`;
         });
         
+        // Tenta copiar o texto para a área de transferência
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(shareText.trim())
                 .then(() => {
@@ -531,8 +579,26 @@ export class ApprovalActions {
                     alert('Não foi possível copiar os links.');
                 });
         } else {
+            // Fallback para ambientes não seguros
             alert('A função de copiar não é suportada em ambientes não seguros (HTTP). Por favor, use HTTPS.');
-            console.warn('[ApprovalActions] navigator.clipboard não está disponível.');
+            console.warn('[ApprovalActions] navigator.clipboard não está disponível. Ambiente não seguro.');
+        }
+    }
+
+    // --- NOVA FUNÇÃO DE FALLBACK PARA COMPARTILHAMENTO ---
+    fallbackShare(text) {
+        // A API de Clipboard também requer um contexto seguro (HTTPS ou localhost)
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    alert('A API de compartilhamento não está disponível neste navegador.\nA legenda foi copiada para a área de transferência!');
+                })
+                .catch(err => {
+                    console.error('[ApprovalActions] Erro ao copiar texto:', err);
+                    alert('Não foi possível copiar o texto.');
+                });
+        } else {
+            alert('A função de compartilhar/copiar não é suportada neste navegador ou em um ambiente não seguro (HTTP).');
         }
     }
 
@@ -579,10 +645,11 @@ export class ApprovalActions {
     }
 
     attachVideoObservers() {
+        // Observar quando vídeos saem do viewport para mutar automaticamente
         const observerOptions = {
             root: null,
             rootMargin: '0px',
-            threshold: 0.5
+            threshold: 0.5 // 50% visível
         };
 
         const observer = new IntersectionObserver((entries) => {
@@ -590,6 +657,7 @@ export class ApprovalActions {
                 const video = entry.target;
                 const indicator = video.parentElement.querySelector('.video-sound-indicator');
                 
+                // Se sair do viewport e estiver com som, mutar
                 if (!entry.isIntersecting && !video.muted) {
                     video.muted = true;
                     if (indicator) {
@@ -601,6 +669,7 @@ export class ApprovalActions {
             });
         }, observerOptions);
 
+        // Observar todos os vídeos
         document.querySelectorAll('.media-video').forEach(video => {
             observer.observe(video);
         });
