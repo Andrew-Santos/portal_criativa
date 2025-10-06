@@ -428,16 +428,29 @@ async handleReject(button) {
             const medias = post.post_media.sort((a, b) => (a.order || 0) - (b.order || 0));
 
             if (medias.length === 1) {
+                // Download único - tenta com fetch, se falhar usa link direto
                 const media = medias[0];
-                const extension = media.type === 'video' ? 'mp4' : 'jpg';
+                const extension = media.type === 'video' ? 'mp4' : 'png';
                 const filename = `post_${postId}_media.${extension}`;
-                await this.downloadMediaAsBlob(media.url_media, filename);
+                
+                try {
+                    await this.downloadMediaAsBlob(media.url_media, filename);
+                } catch (corsError) {
+                    console.warn('[ApprovalActions] CORS bloqueou fetch, usando download direto');
+                    this.downloadDirect(media.url_media, filename);
+                }
             } else {
-                await this.downloadMultipleMediasAsZip(medias, postId);
+                // Múltiplas mídias - tenta ZIP, se falhar faz downloads separados
+                try {
+                    await this.downloadMultipleMediasAsZip(medias, postId);
+                } catch (corsError) {
+                    console.warn('[ApprovalActions] CORS bloqueou ZIP, usando downloads separados');
+                    this.downloadMultipleDirect(medias, postId);
+                }
             }
         } catch (error) {
             console.error('[ApprovalActions] Erro durante o download:', error);
-            alert('Ocorreu um erro ao tentar baixar a mídia. Verifique se o CORS está configurado no servidor.');
+            alert('Ocorreu um erro ao tentar baixar a mídia.');
         } finally {
             button.disabled = false;
             button.innerHTML = originalHTML;
