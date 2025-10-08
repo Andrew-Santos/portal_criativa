@@ -448,35 +448,76 @@ export class RejectionChat {
         const audio = document.getElementById(audioId);
         if (!audio) return;
 
+        const playerContainer = document.querySelector(`[data-audio-id="${audioId}"].audio-player`);
         const playBtn = document.querySelector(`[data-audio-id="${audioId}"].audio-play-btn`);
-        const progressBar = document.querySelector(`[data-audio-id="${audioId}"].audio-progress-bar`);
-        const progressFill = progressBar?.querySelector('.audio-progress-fill');
-        const currentTimeEl = progressBar?.parentElement.querySelector('.audio-current-time');
-        const durationEl = progressBar?.parentElement.querySelector('.audio-duration');
+        const waveformContainer = document.querySelector(`[data-audio-id="${audioId}"].audio-waveform-container`);
+        const progressOverlay = waveformContainer?.querySelector('.audio-progress-overlay');
+        const waveformBars = waveformContainer?.querySelectorAll('.audio-waveform-bar');
+        const currentTimeEl = playerContainer?.querySelector('.audio-current-time');
+        const durationEl = playerContainer?.querySelector('.audio-duration');
+        const playIcon = playBtn?.querySelector('.ph-play');
+        const loadingSpinner = playBtn?.querySelector('.audio-loading-spinner');
 
         let isLoaded = false;
+        let audioContext = null;
+        let analyser = null;
+        let source = null;
+        let animationId = null;
+        let waveformData = [];
+
+        // Função para gerar waveform aleatório (simulado)
+        const generateWaveform = () => {
+            waveformData = Array.from({ length: waveformBars.length }, () => 
+                Math.random() * 0.6 + 0.2 // Valores entre 0.2 e 0.8
+            );
+            waveformBars.forEach((bar, i) => {
+                const height = waveformData[i] * 100;
+                bar.style.height = `${height}%`;
+            });
+        };
 
         // Quando os metadados carregarem
         audio.addEventListener('loadedmetadata', () => {
-            if (durationEl && !isNaN(audio.duration) && isFinite(audio.duration)) {
-                durationEl.textContent = this.formatAudioTime(audio.duration);
+            if (!isNaN(audio.duration) && isFinite(audio.duration)) {
                 isLoaded = true;
+                if (durationEl) durationEl.textContent = this.formatAudioTime(audio.duration);
+                if (playBtn) {
+                    playBtn.disabled = false;
+                    if (loadingSpinner) loadingSpinner.style.display = 'none';
+                    if (playIcon) playIcon.style.display = 'block';
+                }
+                if (playerContainer) playerContainer.classList.remove('loading');
+                generateWaveform();
             }
         });
 
         // Quando o áudio estiver pronto para tocar
         audio.addEventListener('canplay', () => {
-            if (durationEl && !isLoaded && !isNaN(audio.duration) && isFinite(audio.duration)) {
-                durationEl.textContent = this.formatAudioTime(audio.duration);
+            if (!isLoaded && !isNaN(audio.duration) && isFinite(audio.duration)) {
                 isLoaded = true;
+                if (durationEl) durationEl.textContent = this.formatAudioTime(audio.duration);
+                if (playBtn) {
+                    playBtn.disabled = false;
+                    if (loadingSpinner) loadingSpinner.style.display = 'none';
+                    if (playIcon) playIcon.style.display = 'block';
+                }
+                if (playerContainer) playerContainer.classList.remove('loading');
+                generateWaveform();
             }
         });
 
-        // Fallback se loadedmetadata não disparar
+        // Fallback
         audio.addEventListener('durationchange', () => {
-            if (durationEl && !isLoaded && !isNaN(audio.duration) && isFinite(audio.duration)) {
-                durationEl.textContent = this.formatAudioTime(audio.duration);
+            if (!isLoaded && !isNaN(audio.duration) && isFinite(audio.duration)) {
                 isLoaded = true;
+                if (durationEl) durationEl.textContent = this.formatAudioTime(audio.duration);
+                if (playBtn) {
+                    playBtn.disabled = false;
+                    if (loadingSpinner) loadingSpinner.style.display = 'none';
+                    if (playIcon) playIcon.style.display = 'block';
+                }
+                if (playerContainer) playerContainer.classList.remove('loading');
+                generateWaveform();
             }
         });
 
@@ -487,33 +528,94 @@ export class RejectionChat {
                 playBtn.disabled = true;
                 playBtn.style.opacity = '0.5';
             }
+            if (durationEl) durationEl.textContent = 'Erro';
+            if (loadingSpinner) loadingSpinner.style.display = 'none';
         });
+
+        // Configurar Web Audio API para análise de frequência
+        const setupAudioContext = () => {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                source = audioContext.createMediaElementSource(audio);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 128;
+                analyser.smoothingTimeConstant = 0.8;
+                
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+            } catch (error) {
+                console.error('[AudioPlayer] Erro ao configurar AudioContext:', error);
+            }
+        };
+
+        // Animar waveform durante reprodução
+        const animateWaveform = () => {
+            if (!audio.paused && analyser) {
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(dataArray);
+                
+                const step = Math.floor(dataArray.length / waveformBars.length);
+                waveformBars.forEach((bar, index) => {
+                    const value = dataArray[index * step] || 0;
+                    const normalizedValue = value / 255;
+                    const baseHeight = waveformData[index] || 0.3;
+                    const animatedHeight = Math.max(baseHeight, normalizedValue) * 100;
+                    bar.style.height = `${animatedHeight}%`;
+                });
+                
+                animationId = requestAnimationFrame(animateWaveform);
+            } else {
+                // Resetar para waveform estático
+                waveformBars.forEach((bar, i) => {
+                    const height = waveformData[i] * 100;
+                    bar.style.height = `${height}%`;
+                });
+            }
+        };
 
         // Atualizar progresso durante reprodução
         audio.addEventListener('timeupdate', () => {
-            if (!progressFill || !currentTimeEl || !isFinite(audio.duration)) return;
+            if (!currentTimeEl || !isFinite(audio.duration)) return;
             
             const progress = (audio.currentTime / audio.duration) * 100;
-            progressFill.style.width = `${progress}%`;
+            if (progressOverlay) progressOverlay.style.width = `${progress}%`;
             currentTimeEl.textContent = this.formatAudioTime(audio.currentTime);
+            
+            // Atualizar estado das barras
+            const progressIndex = Math.floor((audio.currentTime / audio.duration) * waveformBars.length);
+            waveformBars.forEach((bar, index) => {
+                if (index <= progressIndex) {
+                    bar.classList.add('active');
+                } else {
+                    bar.classList.remove('active');
+                }
+            });
         });
 
         // Quando terminar de tocar
         audio.addEventListener('ended', () => {
             if (playBtn) {
-                playBtn.innerHTML = '<i class="ph-fill ph-play"></i>';
+                const icon = playBtn.querySelector('i');
+                if (icon) {
+                    icon.className = 'ph-fill ph-play';
+                }
             }
-            if (progressFill) {
-                progressFill.style.width = '0%';
-            }
-            if (currentTimeEl) {
-                currentTimeEl.textContent = '0:00';
+            if (progressOverlay) progressOverlay.style.width = '0%';
+            if (currentTimeEl) currentTimeEl.textContent = '0:00';
+            
+            waveformBars.forEach(bar => bar.classList.remove('active'));
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
             }
         });
 
         // Botão play/pause
         if (playBtn) {
             playBtn.addEventListener('click', async () => {
+                if (!isLoaded) return;
+                
                 try {
                     if (audio.paused) {
                         // Pausar outros áudios
@@ -522,16 +624,29 @@ export class RejectionChat {
                                 a.pause();
                                 const otherBtn = document.querySelector(`[data-audio-id="${a.id}"].audio-play-btn`);
                                 if (otherBtn) {
-                                    otherBtn.innerHTML = '<i class="ph-fill ph-play"></i>';
+                                    const otherIcon = otherBtn.querySelector('i');
+                                    if (otherIcon) otherIcon.className = 'ph-fill ph-play';
                                 }
                             }
                         });
                         
+                        // Configurar AudioContext na primeira reprodução
+                        if (!audioContext) {
+                            setupAudioContext();
+                        }
+                        
                         await audio.play();
-                        playBtn.innerHTML = '<i class="ph-fill ph-pause"></i>';
+                        const icon = playBtn.querySelector('i');
+                        if (icon) icon.className = 'ph-fill ph-pause';
+                        animateWaveform();
                     } else {
                         audio.pause();
-                        playBtn.innerHTML = '<i class="ph-fill ph-play"></i>';
+                        const icon = playBtn.querySelector('i');
+                        if (icon) icon.className = 'ph-fill ph-play';
+                        if (animationId) {
+                            cancelAnimationFrame(animationId);
+                            animationId = null;
+                        }
                     }
                 } catch (error) {
                     console.error('[AudioPlayer] Erro ao reproduzir:', error);
@@ -540,11 +655,11 @@ export class RejectionChat {
         }
 
         // Clicar na barra de progresso para buscar
-        if (progressBar) {
-            progressBar.addEventListener('click', (e) => {
+        if (waveformContainer) {
+            waveformContainer.addEventListener('click', (e) => {
                 if (!isFinite(audio.duration)) return;
                 
-                const rect = progressBar.getBoundingClientRect();
+                const rect = waveformContainer.getBoundingClientRect();
                 const percent = (e.clientX - rect.left) / rect.width;
                 audio.currentTime = percent * audio.duration;
             });
@@ -552,6 +667,57 @@ export class RejectionChat {
 
         // Forçar carregamento do áudio
         audio.load();
+    }    appendMessage(message, animate = false) {
+        const messagesContainer = document.getElementById('chat-messages');
+        const isOwnMessage = message.created_by === 'client';
+        
+        const messageEl = document.createElement('div');
+        messageEl.className = `chat-message ${isOwnMessage ? 'own-message' : 'other-message'}`;
+        
+        if (animate) {
+            messageEl.classList.add('message-enter');
+        }
+
+        if (message.message_type === 'text') {
+            messageEl.innerHTML = `
+                <div class="message-bubble">
+                    <p>${this.escapeHtml(message.message_or_url)}</p>
+                    <span class="message-time">${this.formatTime(message.created_at)}</span>
+                </div>
+            `;
+        } else if (message.message_type === 'audio') {
+            const audioId = `audio-${message.id || Date.now()}`;
+            const mimeType = message.mimeType || 'audio/webm';
+            messageEl.innerHTML = `
+                <div class="message-bubble audio-bubble">
+                    <audio id="${audioId}" preload="metadata">
+                        <source src="${message.message_or_url}" type="${mimeType}">
+                    </audio>
+                    <div class="audio-player loading" data-audio-id="${audioId}">
+                        <button class="audio-play-btn" data-audio-id="${audioId}" disabled>
+                            <div class="audio-loading-spinner"></div>
+                            <i class="ph-fill ph-play" style="display: none;"></i>
+                        </button>
+                        <div class="audio-progress-container">
+                            <div class="audio-waveform-container" data-audio-id="${audioId}">
+                                ${Array.from({ length: 40 }, () => '<div class="audio-waveform-bar"></div>').join('')}
+                                <div class="audio-progress-overlay"></div>
+                            </div>
+                            <div class="audio-times">
+                                <span class="audio-current-time">0:00</span>
+                                <span class="audio-duration">Carregando...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="message-time">${this.formatTime(message.created_at)}</span>
+                </div>
+            `;
+            
+            setTimeout(() => this.setupAudioPlayer(audioId), 100);
+        }
+
+        messagesContainer.appendChild(messageEl);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
     formatAudioTime(seconds) {
