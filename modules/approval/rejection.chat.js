@@ -325,9 +325,10 @@ export class RejectionChat {
                 return;
             }
 
-            const audioBlob = new Blob(this.audioChunks, { 
-                type: this.mediaRecorder.mimeType || 'audio/webm'
-            });
+            // Determinar o melhor tipo MIME
+            const mimeType = this.mediaRecorder?.mimeType || 'audio/webm;codecs=opus';
+            
+            const audioBlob = new Blob(this.audioChunks, { type: mimeType });
             
             console.log('[RejectionChat] Blob criado:', audioBlob.size, 'bytes', 'tipo:', audioBlob.type);
 
@@ -338,6 +339,7 @@ export class RejectionChat {
                 return;
             }
 
+            // Criar URL do blob
             const audioUrl = URL.createObjectURL(audioBlob);
 
             const messageObj = {
@@ -347,7 +349,8 @@ export class RejectionChat {
                 created_by: 'client',
                 created_at: new Date().toISOString(),
                 temp: true,
-                audioBlob: audioBlob
+                audioBlob: audioBlob,
+                mimeType: mimeType
             };
 
             this.messages.push(messageObj);
@@ -409,10 +412,11 @@ export class RejectionChat {
             `;
         } else if (message.message_type === 'audio') {
             const audioId = `audio-${message.id || Date.now()}`;
+            const mimeType = message.mimeType || 'audio/webm';
             messageEl.innerHTML = `
                 <div class="message-bubble audio-bubble">
                     <audio id="${audioId}" preload="metadata">
-                        <source src="${message.message_or_url}" type="audio/webm">
+                        <source src="${message.message_or_url}" type="${mimeType}">
                     </audio>
                     <div class="audio-player">
                         <button class="audio-play-btn" data-audio-id="${audioId}">
@@ -424,7 +428,7 @@ export class RejectionChat {
                             </div>
                             <div class="audio-times">
                                 <span class="audio-current-time">0:00</span>
-                                <span class="audio-duration">0:00</span>
+                                <span class="audio-duration">--:--</span>
                             </div>
                         </div>
                     </div>
@@ -450,23 +454,44 @@ export class RejectionChat {
         const currentTimeEl = progressBar?.parentElement.querySelector('.audio-current-time');
         const durationEl = progressBar?.parentElement.querySelector('.audio-duration');
 
+        let isLoaded = false;
+
         // Quando os metadados carregarem
         audio.addEventListener('loadedmetadata', () => {
-            if (durationEl && !isNaN(audio.duration)) {
+            if (durationEl && !isNaN(audio.duration) && isFinite(audio.duration)) {
                 durationEl.textContent = this.formatAudioTime(audio.duration);
+                isLoaded = true;
+            }
+        });
+
+        // Quando o áudio estiver pronto para tocar
+        audio.addEventListener('canplay', () => {
+            if (durationEl && !isLoaded && !isNaN(audio.duration) && isFinite(audio.duration)) {
+                durationEl.textContent = this.formatAudioTime(audio.duration);
+                isLoaded = true;
             }
         });
 
         // Fallback se loadedmetadata não disparar
         audio.addEventListener('durationchange', () => {
-            if (durationEl && !isNaN(audio.duration) && audio.duration !== Infinity) {
+            if (durationEl && !isLoaded && !isNaN(audio.duration) && isFinite(audio.duration)) {
                 durationEl.textContent = this.formatAudioTime(audio.duration);
+                isLoaded = true;
+            }
+        });
+
+        // Tratamento de erro
+        audio.addEventListener('error', (e) => {
+            console.error('[AudioPlayer] Erro ao carregar áudio:', e);
+            if (playBtn) {
+                playBtn.disabled = true;
+                playBtn.style.opacity = '0.5';
             }
         });
 
         // Atualizar progresso durante reprodução
         audio.addEventListener('timeupdate', () => {
-            if (!progressFill || !currentTimeEl) return;
+            if (!progressFill || !currentTimeEl || !isFinite(audio.duration)) return;
             
             const progress = (audio.currentTime / audio.duration) * 100;
             progressFill.style.width = `${progress}%`;
@@ -488,24 +513,28 @@ export class RejectionChat {
 
         // Botão play/pause
         if (playBtn) {
-            playBtn.addEventListener('click', () => {
-                if (audio.paused) {
-                    // Pausar outros áudios
-                    document.querySelectorAll('audio').forEach(a => {
-                        if (a !== audio && !a.paused) {
-                            a.pause();
-                            const otherBtn = document.querySelector(`[data-audio-id="${a.id}"].audio-play-btn`);
-                            if (otherBtn) {
-                                otherBtn.innerHTML = '<i class="ph-fill ph-play"></i>';
+            playBtn.addEventListener('click', async () => {
+                try {
+                    if (audio.paused) {
+                        // Pausar outros áudios
+                        document.querySelectorAll('audio').forEach(a => {
+                            if (a !== audio && !a.paused) {
+                                a.pause();
+                                const otherBtn = document.querySelector(`[data-audio-id="${a.id}"].audio-play-btn`);
+                                if (otherBtn) {
+                                    otherBtn.innerHTML = '<i class="ph-fill ph-play"></i>';
+                                }
                             }
-                        }
-                    });
-                    
-                    audio.play();
-                    playBtn.innerHTML = '<i class="ph-fill ph-pause"></i>';
-                } else {
-                    audio.pause();
-                    playBtn.innerHTML = '<i class="ph-fill ph-play"></i>';
+                        });
+                        
+                        await audio.play();
+                        playBtn.innerHTML = '<i class="ph-fill ph-pause"></i>';
+                    } else {
+                        audio.pause();
+                        playBtn.innerHTML = '<i class="ph-fill ph-play"></i>';
+                    }
+                } catch (error) {
+                    console.error('[AudioPlayer] Erro ao reproduzir:', error);
                 }
             });
         }
@@ -513,11 +542,16 @@ export class RejectionChat {
         // Clicar na barra de progresso para buscar
         if (progressBar) {
             progressBar.addEventListener('click', (e) => {
+                if (!isFinite(audio.duration)) return;
+                
                 const rect = progressBar.getBoundingClientRect();
                 const percent = (e.clientX - rect.left) / rect.width;
                 audio.currentTime = percent * audio.duration;
             });
         }
+
+        // Forçar carregamento do áudio
+        audio.load();
     }
 
     formatAudioTime(seconds) {
