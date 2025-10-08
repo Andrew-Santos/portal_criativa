@@ -408,18 +408,124 @@ export class RejectionChat {
                 </div>
             `;
         } else if (message.message_type === 'audio') {
+            const audioId = `audio-${message.id || Date.now()}`;
             messageEl.innerHTML = `
                 <div class="message-bubble audio-bubble">
-                    <audio controls preload="metadata">
+                    <audio id="${audioId}" preload="metadata">
                         <source src="${message.message_or_url}" type="audio/webm">
                     </audio>
+                    <div class="audio-player">
+                        <button class="audio-play-btn" data-audio-id="${audioId}">
+                            <i class="ph-fill ph-play"></i>
+                        </button>
+                        <div class="audio-progress-container">
+                            <div class="audio-progress-bar" data-audio-id="${audioId}">
+                                <div class="audio-progress-fill"></div>
+                            </div>
+                            <div class="audio-times">
+                                <span class="audio-current-time">0:00</span>
+                                <span class="audio-duration">0:00</span>
+                            </div>
+                        </div>
+                    </div>
                     <span class="message-time">${this.formatTime(message.created_at)}</span>
                 </div>
             `;
+            
+            // Configurar player após adicionar ao DOM
+            setTimeout(() => this.setupAudioPlayer(audioId), 100);
         }
 
         messagesContainer.appendChild(messageEl);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    setupAudioPlayer(audioId) {
+        const audio = document.getElementById(audioId);
+        if (!audio) return;
+
+        const playBtn = document.querySelector(`[data-audio-id="${audioId}"].audio-play-btn`);
+        const progressBar = document.querySelector(`[data-audio-id="${audioId}"].audio-progress-bar`);
+        const progressFill = progressBar?.querySelector('.audio-progress-fill');
+        const currentTimeEl = progressBar?.parentElement.querySelector('.audio-current-time');
+        const durationEl = progressBar?.parentElement.querySelector('.audio-duration');
+
+        // Quando os metadados carregarem
+        audio.addEventListener('loadedmetadata', () => {
+            if (durationEl && !isNaN(audio.duration)) {
+                durationEl.textContent = this.formatAudioTime(audio.duration);
+            }
+        });
+
+        // Fallback se loadedmetadata não disparar
+        audio.addEventListener('durationchange', () => {
+            if (durationEl && !isNaN(audio.duration) && audio.duration !== Infinity) {
+                durationEl.textContent = this.formatAudioTime(audio.duration);
+            }
+        });
+
+        // Atualizar progresso durante reprodução
+        audio.addEventListener('timeupdate', () => {
+            if (!progressFill || !currentTimeEl) return;
+            
+            const progress = (audio.currentTime / audio.duration) * 100;
+            progressFill.style.width = `${progress}%`;
+            currentTimeEl.textContent = this.formatAudioTime(audio.currentTime);
+        });
+
+        // Quando terminar de tocar
+        audio.addEventListener('ended', () => {
+            if (playBtn) {
+                playBtn.innerHTML = '<i class="ph-fill ph-play"></i>';
+            }
+            if (progressFill) {
+                progressFill.style.width = '0%';
+            }
+            if (currentTimeEl) {
+                currentTimeEl.textContent = '0:00';
+            }
+        });
+
+        // Botão play/pause
+        if (playBtn) {
+            playBtn.addEventListener('click', () => {
+                if (audio.paused) {
+                    // Pausar outros áudios
+                    document.querySelectorAll('audio').forEach(a => {
+                        if (a !== audio && !a.paused) {
+                            a.pause();
+                            const otherBtn = document.querySelector(`[data-audio-id="${a.id}"].audio-play-btn`);
+                            if (otherBtn) {
+                                otherBtn.innerHTML = '<i class="ph-fill ph-play"></i>';
+                            }
+                        }
+                    });
+                    
+                    audio.play();
+                    playBtn.innerHTML = '<i class="ph-fill ph-pause"></i>';
+                } else {
+                    audio.pause();
+                    playBtn.innerHTML = '<i class="ph-fill ph-play"></i>';
+                }
+            });
+        }
+
+        // Clicar na barra de progresso para buscar
+        if (progressBar) {
+            progressBar.addEventListener('click', (e) => {
+                const rect = progressBar.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                audio.currentTime = percent * audio.duration;
+            });
+        }
+    }
+
+    formatAudioTime(seconds) {
+        if (isNaN(seconds) || !isFinite(seconds)) return '0:00';
+        
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
     async confirmRejection() {
