@@ -338,52 +338,67 @@ export class ApprovalActions {
     }
 
     async handleReject(button) {
-    const postId = button.dataset.postId;
-    const post = this.posts.find(p => p.id == postId);
-    
-    console.log('[ApprovalActions] handleReject chamado para post:', postId);
-    console.log('[ApprovalActions] Post encontrado:', post);
-    console.log('[ApprovalActions] RejectionChat disponível?', typeof RejectionChat);
-    
-    if (!post) {
-        alert('Post não encontrado.');
-        return;
-    }
-
-    try {
-        // Abrir modal de chat
-        const chat = new RejectionChat(postId, post);
-        console.log('[ApprovalActions] Instância do chat criada:', chat);
-        chat.open();
-    } catch (error) {
-        console.error('[ApprovalActions] Erro ao abrir chat:', error);
-        alert('Erro ao abrir chat de rejeição. Verifique o console: ' + error.message);
-    }
-}
-
-handlePostRejectedFromChat(postId) {
-    console.log('[ApprovalActions] Post rejeitado via chat:', postId);
-    
-    // Remover card da lista
-    const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
-    if (card) {
-        card.style.animation = 'fadeOut 0.3s ease';
-        setTimeout(() => {
-            card.remove();
-            
-            // Verificar se ficou vazio
-            const remaining = document.querySelectorAll('.post-card').length;
-            if (remaining === 0) {
-                this.renderer.renderPosts([]);
-            }
-        }, 300);
-    }
-}
-
-    async handleDownload(button) {
         const postId = button.dataset.postId;
         const post = this.posts.find(p => p.id == postId);
+        
+        console.log('[ApprovalActions] handleReject chamado para post:', postId);
+        console.log('[ApprovalActions] Post encontrado:', post);
+        console.log('[ApprovalActions] RejectionChat disponível?', typeof RejectionChat);
+        
+        if (!post) {
+            alert('Post não encontrado.');
+            return;
+        }
 
+        try {
+            // Abrir modal de chat
+            const chat = new RejectionChat(postId, post);
+            console.log('[ApprovalActions] Instância do chat criada:', chat);
+            chat.open();
+        } catch (error) {
+            console.error('[ApprovalActions] Erro ao abrir chat:', error);
+            alert('Erro ao abrir chat de rejeição. Verifique o console: ' + error.message);
+        }
+    }
+
+    handlePostRejectedFromChat(postId) {
+        console.log('[ApprovalActions] Post rejeitado via chat:', postId);
+        
+        // Remover card da lista
+        const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+        if (card) {
+            card.style.animation = 'fadeOut 0.3s ease';
+            setTimeout(() => {
+                card.remove();
+                
+                // Verificar se ficou vazio
+                const remaining = document.querySelectorAll('.post-card').length;
+                if (remaining === 0) {
+                    this.renderer.renderPosts([]);
+                }
+            }, 300);
+        }
+    }
+
+    /**
+     * Gerencia o download de mídias de um post
+     * @param {HTMLElement} button - Botão de download clicado
+     * 
+     * Fluxo:
+     * 1. Identifica o post e valida se possui mídias
+     * 2. Desabilita o botão e mostra feedback visual
+     * 3. Ordena as mídias pela ordem correta
+     * 4. Para UMA mídia: tenta baixar via blob (bypass CORS)
+     * 5. Para MÚLTIPLAS mídias: tenta criar ZIP com todas
+     * 6. Se CORS bloquear: fallback para abrir em nova aba ou modal com links
+     * 7. Restaura o botão ao estado original
+     */
+    async handleDownload(button) {
+        // 1. IDENTIFICAR POST E VALIDAR MÍDIAS
+        const postId = button.dataset.postId; // Pega o ID do post do atributo data-post-id
+        const post = this.posts.find(p => p.id == postId); // Busca o post completo na lista
+
+        // Se não encontrou o post ou não tem mídias, aborta
         if (!post || !post.post_media || post.post_media.length === 0) {
             alert('Nenhuma mídia disponível para download.');
             return;
@@ -391,98 +406,125 @@ handlePostRejectedFromChat(postId) {
 
         console.log('[ApprovalActions] Iniciando download para o post:', postId);
 
-        button.disabled = true;
-        const originalHTML = button.innerHTML;
-        button.innerHTML = '<div class="btn-spinner"></div> Baixando...';
+        // 2. DESABILITAR BOTÃO E MOSTRAR FEEDBACK VISUAL
+        button.disabled = true; // Impede cliques múltiplos
+        const originalHTML = button.innerHTML; // Salva conteúdo original para restaurar depois
+        button.innerHTML = '<div class="btn-spinner"></div> Baixando...'; // Mostra spinner animado
 
         try {
+            // 3. ORDENAR MÍDIAS PELA ORDEM CORRETA
+            // Ordena as mídias pelo campo 'order' (mídias sem order ficam no início)
             const medias = post.post_media.sort((a, b) => (a.order || 0) - (b.order || 0));
-            
-            // Detectar dispositivo móvel
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-            if (isMobile) {
-                // No celular, sempre usar download direto
-                if (medias.length === 1) {
-                    const media = medias[0];
-                    const extension = media.type === 'video' ? 'mp4' : 'jpg';
-                    const filename = `post_${postId}_media.${extension}`;
-                    this.downloadDirect(media.url_media, filename);
-                } else {
-                    this.downloadMultipleDirect(medias, postId);
+            // 4. DOWNLOAD DE UMA ÚNICA MÍDIA
+            if (medias.length === 1) {
+                const media = medias[0];
+                // Define extensão baseada no tipo (video = mp4, imagem = jpg)
+                const extension = media.type === 'video' ? 'mp4' : 'jpg';
+                const filename = `post_${postId}_media.${extension}`;
+                
+                try {
+                    // TENTA BAIXAR VIA BLOB (método mais confiável)
+                    // Faz fetch da mídia, converte para blob e força download
+                    await this.downloadMediaAsBlob(media.url_media, filename);
+                } catch (corsError) {
+                    // SE CORS BLOQUEAR: abre em nova aba como fallback
+                    console.warn('[ApprovalActions] CORS bloqueou fetch, abrindo em nova aba');
+                    window.open(media.url_media, '_blank');
+                    alert('Download bloqueado por CORS. A mídia foi aberta em nova aba. Use "Salvar como..." para baixar.');
                 }
-            } else {
-                // No desktop, tentar blob/ZIP
-                if (medias.length === 1) {
-                    const media = medias[0];
-                    const extension = media.type === 'video' ? 'mp4' : 'png';
-                    const filename = `post_${postId}_media.${extension}`;
-                    
-                    try {
-                        await this.downloadMediaAsBlob(media.url_media, filename);
-                    } catch (corsError) {
-                        console.warn('[ApprovalActions] CORS bloqueou fetch, usando download direto');
-                        this.downloadDirect(media.url_media, filename);
-                    }
-                } else {
-                    try {
-                        await this.downloadMultipleMediasAsZip(medias, postId);
-                    } catch (corsError) {
-                        console.warn('[ApprovalActions] CORS bloqueou ZIP, usando downloads separados');
-                        this.downloadMultipleDirect(medias, postId);
-                    }
+            } 
+            // 5. DOWNLOAD DE MÚLTIPLAS MÍDIAS
+            else {
+                try {
+                    // TENTA CRIAR UM ARQUIVO ZIP com todas as mídias
+                    // Usa a biblioteca JSZip para empacotar tudo
+                    await this.downloadMultipleMediasAsZip(medias, postId);
+                } catch (corsError) {
+                    // SE CORS BLOQUEAR: mostra modal com links individuais
+                    console.warn('[ApprovalActions] CORS bloqueou ZIP, mostrando links');
+                    this.showMediaLinksModal(medias, postId);
                 }
             }
         } catch (error) {
+            // TRATAMENTO DE ERRO GERAL
             console.error('[ApprovalActions] Erro durante o download:', error);
             alert('Ocorreu um erro ao tentar baixar a mídia.');
         } finally {
-            button.disabled = false;
-            button.innerHTML = originalHTML;
+            // 7. SEMPRE RESTAURAR O BOTÃO (mesmo se der erro)
+            button.disabled = false; // Reabilita o botão
+            button.innerHTML = originalHTML; // Restaura texto/ícone original
         }
     }
 
+    /**
+     * Baixa uma mídia individual usando fetch + blob
+     * Este método tenta fazer bypass de CORS convertendo a resposta para blob
+     * @param {string} url - URL da mídia
+     * @param {string} filename - Nome do arquivo para download
+     */
     async downloadMediaAsBlob(url, filename) {
         try {
+            // Faz requisição para buscar a mídia
             const response = await fetch(url);
+            
+            // Se a resposta não for OK (200-299), lança erro
             if (!response.ok) {
                 throw new Error(`Falha na rede ao buscar a mídia: ${response.statusText}`);
             }
+            
+            // Converte a resposta para blob (Binary Large Object)
             const blob = await response.blob();
+            
+            // Cria uma URL temporária do blob
             const objectUrl = URL.createObjectURL(blob);
+            
+            // Cria elemento <a> invisível para forçar download
             const a = document.createElement('a');
             a.href = objectUrl;
-            a.download = filename;
+            a.download = filename; // Nome do arquivo
             document.body.appendChild(a);
-            a.click();
+            a.click(); // Simula clique para iniciar download
             document.body.removeChild(a);
+            
+            // Libera a memória da URL temporária
             URL.revokeObjectURL(objectUrl);
         } catch (error) {
             console.error(`[ApprovalActions] Erro no fetch de ${url}:`, error);
-            throw error;
+            throw error; // Repassa o erro para tratamento superior
         }
     }
 
+    /**
+     * Baixa múltiplas mídias em um arquivo ZIP
+     * @param {Array} medias - Array de objetos de mídia
+     * @param {string} postId - ID do post
+     */
     async downloadMultipleMediasAsZip(medias, postId) {
+        // Verifica se a biblioteca JSZip está carregada
         if (typeof JSZip === 'undefined') {
             alert('Erro: A biblioteca JSZip não foi carregada.');
             throw new Error("JSZip não está definido");
         }
 
+        // Cria nova instância do ZIP
         const zip = new JSZip();
         const zipFilename = `post_${postId}_midias.zip`;
 
+        // Cria array de promises para baixar todas as mídias em paralelo
         const promises = medias.map(async (media) => {
             const response = await fetch(media.url_media);
-            if (!response.ok) return null;
+            if (!response.ok) return null; // Se falhar, retorna null
             return {
                 blob: await response.blob(),
                 type: media.type
             };
         });
 
+        // Aguarda todas as promises resolverem
         const results = await Promise.all(promises);
 
+        // Adiciona cada mídia ao ZIP
         results.forEach((result, index) => {
             if (result) {
                 const extension = result.type === 'video' ? 'mp4' : 'png';
@@ -491,7 +533,10 @@ handlePostRejectedFromChat(postId) {
             }
         });
 
+        // Gera o arquivo ZIP
         const zipBlob = await zip.generateAsync({ type: 'blob' });
+        
+        // Cria URL temporária e força download
         const objectUrl = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
         a.href = objectUrl;
@@ -502,22 +547,11 @@ handlePostRejectedFromChat(postId) {
         URL.revokeObjectURL(objectUrl);
     }
 
-    downloadDirect(url, filename) {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    }
-
-    downloadMultipleDirect(medias, postId) {
-        // No mobile, mostrar modal com links para o usuário escolher
-        this.showMediaLinksModal(medias, postId);
-    }
-
+    /**
+     * Mostra modal com links para download manual (usado no mobile quando CORS bloqueia)
+     * @param {Array} medias - Array de mídias
+     * @param {string} postId - ID do post
+     */
     showMediaLinksModal(medias, postId) {
         const modal = document.createElement('div');
         modal.className = 'media-links-modal';
@@ -528,7 +562,7 @@ handlePostRejectedFromChat(postId) {
                 <p>Toque em cada link para baixar:</p>
                 <div class="media-links-list">
                     ${medias.map((media, i) => {
-                        const extension = media.type === 'video' ? '🎥 Vídeo' : '📷 Imagem';
+                        const extension = media.type === 'video' ? 'Vídeo' : 'Imagem';
                         return `
                             <a href="${media.url_media}" 
                                download="post_${postId}_media_${i + 1}" 
@@ -547,11 +581,12 @@ handlePostRejectedFromChat(postId) {
 
         document.body.appendChild(modal);
 
-        // Fechar modal
+        // Fechar modal ao clicar no botão
         modal.querySelector('.btn-close-modal').addEventListener('click', () => {
             modal.remove();
         });
 
+        // Fechar modal ao clicar no overlay
         modal.querySelector('.modal-overlay').addEventListener('click', () => {
             modal.remove();
         });
