@@ -1,4 +1,3 @@
-
 export class RejectionChat {
     constructor(postId, postData) {
         this.postId = postId;
@@ -7,15 +6,17 @@ export class RejectionChat {
         this.mediaRecorder = null;
         this.audioChunks = [];
         this.recordingStartTime = null;
-        this.messages = []; // Armazenar mensagens em memória até confirmação
+        this.messages = [];
+        this.audioContext = null;
+        this.analyser = null;
+        this.dataArray = null;
+        this.animationId = null;
     }
 
     open() {
         console.log('[RejectionChat] Abrindo chat para post:', this.postId);
         this.render();
         this.attachEvents();
-        
-        // Bloquear scroll
         document.body.style.overflow = 'hidden';
     }
 
@@ -26,7 +27,6 @@ export class RejectionChat {
         modal.innerHTML = `
             <div class="chat-overlay"></div>
             <div class="chat-container">
-                <!-- Header -->
                 <div class="chat-header">
                     <div class="chat-header-content">
                         <button class="chat-back-btn">
@@ -34,34 +34,27 @@ export class RejectionChat {
                         </button>
                         <div class="chat-header-info">
                             <h3>Motivo da Recusa</h3>
-                            <p>Explique por que o post foi recusado</p>
+                            <p>Explique o motivo da rejeição</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Messages Area -->
                 <div class="chat-messages" id="chat-messages">
                     <div class="chat-date-divider">
                         <span>Hoje</span>
                     </div>
-                    <!-- Mensagens serão carregadas aqui -->
                 </div>
 
-                <!-- Input Area -->
                 <div class="chat-input-area">
                     <div class="chat-input-wrapper" id="chat-input-wrapper">
-                        <button class="chat-emoji-btn" id="chat-emoji-btn" title="Emoji">
-                            <i class="ph ph-smiley"></i>
-                        </button>
-                        
                         <textarea 
                             class="chat-textarea" 
                             id="chat-textarea" 
-                            placeholder="Digite uma mensagem..."
+                            placeholder="Digite sua mensagem..."
                             rows="1"
-                            maxlength="1000"></textarea>
+                            maxlength="500"></textarea>
                         
-                        <button class="chat-attach-btn" id="chat-mic-btn" title="Gravar áudio">
+                        <button class="chat-mic-btn" id="chat-mic-btn" title="Gravar áudio">
                             <i class="ph-fill ph-microphone"></i>
                         </button>
                     </div>
@@ -70,16 +63,15 @@ export class RejectionChat {
                         <i class="ph-fill ph-paper-plane-tilt"></i>
                     </button>
 
-                    <!-- Recording UI (hidden by default) -->
                     <div class="chat-recording-ui" id="chat-recording-ui" style="display: none;">
                         <div class="recording-content">
                             <button class="recording-cancel-btn" id="recording-cancel-btn">
                                 <i class="ph-bold ph-x"></i>
                             </button>
-                            <div class="recording-indicator">
-                                <div class="recording-dot"></div>
-                                <span class="recording-time" id="recording-time">0:00</span>
+                            <div class="audio-visualizer-container" id="audio-visualizer">
+                                ${Array.from({ length: 20 }, () => '<div class="audio-bar"></div>').join('')}
                             </div>
+                            <span class="recording-time" id="recording-time">0:00</span>
                             <button class="recording-send-btn" id="recording-send-btn">
                                 <i class="ph-fill ph-check"></i>
                             </button>
@@ -87,11 +79,10 @@ export class RejectionChat {
                     </div>
                 </div>
 
-                <!-- Footer com botão de rejeitar -->
                 <div class="chat-footer">
                     <button class="chat-reject-btn" id="final-reject-btn">
                         <i class="ph ph-x-circle"></i>
-                        Confirmar Recusa do Post
+                        Confirmar Recusa
                     </button>
                 </div>
             </div>
@@ -99,23 +90,19 @@ export class RejectionChat {
 
         document.body.appendChild(modal);
 
-        // Animar entrada
         setTimeout(() => {
             modal.classList.add('active');
         }, 10);
 
-        // Carregar mensagens existentes
         this.loadMessages();
     }
 
     attachEvents() {
         const modal = document.getElementById('rejection-chat-modal');
         
-        // Fechar
         modal.querySelector('.chat-back-btn').addEventListener('click', () => this.close());
         modal.querySelector('.chat-overlay').addEventListener('click', () => this.close());
 
-        // Textarea auto-resize e envio
         const textarea = document.getElementById('chat-textarea');
         const sendBtn = document.getElementById('chat-send-btn');
 
@@ -133,28 +120,21 @@ export class RejectionChat {
             }
         });
 
-        // Enviar texto (apenas salvar em memória)
         sendBtn.addEventListener('click', () => {
             if (textarea.value.trim()) {
                 this.addTextMessage(textarea.value.trim());
             }
         });
 
-        // Botão de microfone
-        const micBtn = document.getElementById('chat-mic-btn');
-        micBtn.addEventListener('click', () => this.toggleRecording());
-
-        // Botões de gravação
+        document.getElementById('chat-mic-btn').addEventListener('click', () => this.toggleRecording());
         document.getElementById('recording-cancel-btn').addEventListener('click', () => this.cancelRecording());
-        document.getElementById('recording-send-btn').addEventListener('click', () => this.addAudioMessage());
-
-        // Botão de rejeitar final (salva tudo no banco)
+        document.getElementById('recording-send-btn').addEventListener('click', () => this.stopAndPreviewAudio());
         document.getElementById('final-reject-btn').addEventListener('click', () => this.confirmRejection());
     }
 
     autoResizeTextarea(textarea) {
         textarea.style.height = 'auto';
-        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
     }
 
     async loadMessages() {
@@ -170,8 +150,6 @@ export class RejectionChat {
             if (data && data.length > 0) {
                 this.messages = data;
                 data.forEach(msg => this.appendMessage(msg, false));
-                const messagesContainer = document.getElementById('chat-messages');
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
         } catch (error) {
             console.error('[RejectionChat] Erro ao carregar mensagens:', error);
@@ -182,17 +160,13 @@ export class RejectionChat {
         const textarea = document.getElementById('chat-textarea');
         const sendBtn = document.getElementById('chat-send-btn');
         
-        textarea.disabled = true;
-        sendBtn.disabled = true;
-
-        // Simular mensagem localmente
         const messageObj = {
             id: Date.now(),
             message_type: 'text',
             message_or_url: text,
             created_by: 'client',
             created_at: new Date().toISOString(),
-            temp: true // Marcar como temporária
+            temp: true
         };
 
         this.messages.push(messageObj);
@@ -200,7 +174,6 @@ export class RejectionChat {
 
         textarea.value = '';
         this.autoResizeTextarea(textarea);
-        textarea.disabled = false;
         sendBtn.disabled = true;
         textarea.focus();
     }
@@ -215,37 +188,62 @@ export class RejectionChat {
 
     async startRecording() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { 
+                    echoCancellation: true, 
+                    noiseSuppression: true,
+                    autoGainControl: false
+                }
+            });
             
-            this.mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'audio/webm;codecs=opus'
+            // Configurar MediaRecorder
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+                ? 'audio/webm;codecs=opus'
+                : MediaRecorder.isTypeSupported('audio/webm')
+                ? 'audio/webm'
+                : 'audio/mp4';
+
+            this.mediaRecorder = new MediaRecorder(stream, { 
+                mimeType,
+                audioBitsPerSecond: 128000
             });
             
             this.audioChunks = [];
             this.recordingStartTime = Date.now();
 
+            // Coletar dados durante a gravação
             this.mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
+                if (event.data && event.data.size > 0) {
+                    console.log('[RejectionChat] Chunk recebido:', event.data.size, 'bytes');
                     this.audioChunks.push(event.data);
                 }
             };
 
             this.mediaRecorder.onstop = () => {
+                console.log('[RejectionChat] Gravação finalizada. Total chunks:', this.audioChunks.length);
                 stream.getTracks().forEach(track => track.stop());
             };
 
-            this.mediaRecorder.start();
+            this.mediaRecorder.onerror = (event) => {
+                console.error('[RejectionChat] Erro no MediaRecorder:', event.error);
+                alert('Erro ao gravar áudio: ' + event.error);
+                this.cancelRecording();
+            };
+
+            // Iniciar gravação coletando dados a cada 100ms
+            this.mediaRecorder.start(100);
             this.isRecording = true;
+
+            // Configurar visualizador de áudio
+            this.setupAudioVisualizer(stream);
 
             // Mostrar UI de gravação
             document.getElementById('chat-input-wrapper').style.display = 'none';
             document.getElementById('chat-send-btn').style.display = 'none';
             document.getElementById('chat-recording-ui').style.display = 'flex';
 
-            // Iniciar contador
             this.startRecordingTimer();
-
-            console.log('[RejectionChat] Gravação iniciada');
+            console.log('[RejectionChat] Gravação iniciada - MIME:', mimeType);
             
         } catch (error) {
             console.error('[RejectionChat] Erro ao iniciar gravação:', error);
@@ -253,57 +251,125 @@ export class RejectionChat {
         }
     }
 
+    setupAudioVisualizer(stream) {
+        // Criar contexto de áudio
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = this.audioContext.createMediaStreamSource(stream);
+        
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 64;
+        this.analyser.smoothingTimeConstant = 0.8;
+        
+        source.connect(this.analyser);
+        
+        const bufferLength = this.analyser.frequencyBinCount;
+        this.dataArray = new Uint8Array(bufferLength);
+        
+        this.visualizeAudio();
+    }
+
+    visualizeAudio() {
+        if (!this.isRecording) return;
+
+        this.animationId = requestAnimationFrame(() => this.visualizeAudio());
+        
+        this.analyser.getByteFrequencyData(this.dataArray);
+        
+        const bars = document.querySelectorAll('#audio-visualizer .audio-bar');
+        const step = Math.floor(this.dataArray.length / bars.length);
+        
+        bars.forEach((bar, index) => {
+            const value = this.dataArray[index * step] || 0;
+            const heightPercent = (value / 255) * 100;
+            const height = Math.max(8, (heightPercent / 100) * 40);
+            bar.style.height = `${height}px`;
+        });
+    }
+
     stopRecording() {
         if (this.mediaRecorder && this.isRecording) {
-            this.mediaRecorder.stop();
             this.isRecording = false;
+            
+            // Parar animação
+            if (this.animationId) {
+                cancelAnimationFrame(this.animationId);
+            }
+            
+            // Fechar contexto de áudio
+            if (this.audioContext) {
+                this.audioContext.close();
+                this.audioContext = null;
+            }
+            
+            // Parar timer
             this.stopRecordingTimer();
+            
+            // Parar MediaRecorder
+            if (this.mediaRecorder.state !== 'inactive') {
+                this.mediaRecorder.stop();
+            }
+            
             console.log('[RejectionChat] Gravação parada');
         }
+    }
+
+    stopAndPreviewAudio() {
+        this.stopRecording();
+
+        // Aguardar um pouco para garantir que todos os chunks foram coletados
+        setTimeout(() => {
+            if (this.audioChunks.length === 0) {
+                console.error('[RejectionChat] Nenhum chunk de áudio!');
+                alert('Nenhum áudio foi gravado. Tente novamente.');
+                this.cancelRecording();
+                return;
+            }
+
+            const audioBlob = new Blob(this.audioChunks, { 
+                type: this.mediaRecorder.mimeType || 'audio/webm'
+            });
+            
+            console.log('[RejectionChat] Blob criado:', audioBlob.size, 'bytes', 'tipo:', audioBlob.type);
+
+            if (audioBlob.size === 0) {
+                console.error('[RejectionChat] ERRO: Blob vazio!');
+                alert('Áudio gravado mas está vazio. Tente novamente.');
+                this.cancelRecording();
+                return;
+            }
+
+            const audioUrl = URL.createObjectURL(audioBlob);
+
+            const messageObj = {
+                id: Date.now(),
+                message_type: 'audio',
+                message_or_url: audioUrl,
+                created_by: 'client',
+                created_at: new Date().toISOString(),
+                temp: true,
+                audioBlob: audioBlob
+            };
+
+            this.messages.push(messageObj);
+            this.appendMessage(messageObj, true);
+
+            this.audioChunks = [];
+
+            document.getElementById('chat-input-wrapper').style.display = 'flex';
+            document.getElementById('chat-send-btn').style.display = 'flex';
+            document.getElementById('chat-recording-ui').style.display = 'none';
+        }, 300);
     }
 
     cancelRecording() {
         this.stopRecording();
         this.audioChunks = [];
         
-        // Voltar UI normal
         document.getElementById('chat-input-wrapper').style.display = 'flex';
         document.getElementById('chat-send-btn').style.display = 'flex';
         document.getElementById('chat-recording-ui').style.display = 'none';
         
         console.log('[RejectionChat] Gravação cancelada');
-    }
-
-    addAudioMessage() {
-        this.stopRecording();
-
-        // Criar blob do áudio
-        const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-        
-        // Criar URL local para reprodução
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        // Adicionar mensagem de áudio localmente
-        const messageObj = {
-            id: Date.now(),
-            message_type: 'audio',
-            message_or_url: audioUrl,
-            created_by: 'client',
-            created_at: new Date().toISOString(),
-            temp: true,
-            audioBlob: audioBlob // Armazenar o blob para envio posterior
-        };
-
-        this.messages.push(messageObj);
-        this.appendMessage(messageObj, true);
-
-        // Limpar
-        this.audioChunks = [];
-        
-        // Voltar UI normal
-        document.getElementById('chat-input-wrapper').style.display = 'flex';
-        document.getElementById('chat-send-btn').style.display = 'flex';
-        document.getElementById('chat-recording-ui').style.display = 'none';
     }
 
     startRecordingTimer() {
@@ -314,13 +380,12 @@ export class RejectionChat {
             const minutes = Math.floor(elapsed / 60);
             const seconds = elapsed % 60;
             timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }, 1000);
+        }, 100);
     }
 
     stopRecordingTimer() {
         if (this.recordingInterval) {
             clearInterval(this.recordingInterval);
-            this.recordingInterval = null;
         }
     }
 
@@ -342,11 +407,12 @@ export class RejectionChat {
                     <span class="message-time">${this.formatTime(message.created_at)}</span>
                 </div>
             `;
-        } else {
-            // Áudio
+        } else if (message.message_type === 'audio') {
             messageEl.innerHTML = `
                 <div class="message-bubble audio-bubble">
-                    <audio controls src="${message.message_or_url}"></audio>
+                    <audio controls preload="metadata">
+                        <source src="${message.message_or_url}" type="audio/webm">
+                    </audio>
                     <span class="message-time">${this.formatTime(message.created_at)}</span>
                 </div>
             `;
@@ -359,7 +425,12 @@ export class RejectionChat {
     async confirmRejection() {
         const btn = document.getElementById('final-reject-btn');
         
-        if (!confirm('Confirmar a recusa deste post? Esta ação não pode ser desfeita.')) {
+        if (this.messages.length === 0) {
+            alert('Adicione pelo menos uma mensagem antes de confirmar.');
+            return;
+        }
+
+        if (!confirm('Confirmar recusa do post?')) {
             return;
         }
 
@@ -368,11 +439,9 @@ export class RejectionChat {
         btn.innerHTML = '<div class="btn-spinner"></div> Processando...';
 
         try {
-            // Enviar todas as mensagens para o banco
             for (const message of this.messages) {
-                if (message.message_type === 'text') {
-                    // Texto - enviar direto
-                    await window.supabaseClient
+                if (message.temp && message.message_type === 'text') {
+                    const { error } = await window.supabaseClient
                         .from('rejection_chat')
                         .insert({
                             id_post: this.postId,
@@ -380,27 +449,36 @@ export class RejectionChat {
                             message_or_url: message.message_or_url,
                             created_by: 'client'
                         });
-                } else if (message.message_type === 'audio' && message.audioBlob) {
-                    // Áudio - fazer upload e obter URL
+
+                    if (error) throw error;
+                    console.log('[RejectionChat] Texto salvo');
+                } 
+                else if (message.temp && message.message_type === 'audio' && message.audioBlob) {
+                    console.log('[RejectionChat] Iniciando upload de áudio. Tamanho:', message.audioBlob.size);
+
                     const fileName = `${this.postId}_${Date.now()}.webm`;
                     
                     const { data: uploadData, error: uploadError } = await window.supabaseClient
                         .storage
                         .from('rejection-audios')
                         .upload(fileName, message.audioBlob, {
-                            contentType: 'audio/webm',
-                            cacheControl: '3600'
+                            contentType: message.audioBlob.type,
+                            upsert: false
                         });
 
-                    if (uploadError) throw uploadError;
+                    if (uploadError) {
+                        console.error('[RejectionChat] Erro upload:', uploadError);
+                        throw uploadError;
+                    }
+
+                    console.log('[RejectionChat] Áudio salvo:', fileName);
 
                     const { data: urlData } = window.supabaseClient
                         .storage
                         .from('rejection-audios')
                         .getPublicUrl(fileName);
 
-                    // Salvar referência no banco
-                    await window.supabaseClient
+                    const { error: insertError } = await window.supabaseClient
                         .from('rejection_chat')
                         .insert({
                             id_post: this.postId,
@@ -408,12 +486,13 @@ export class RejectionChat {
                             message_or_url: urlData.publicUrl,
                             created_by: 'client'
                         });
+
+                    if (insertError) throw insertError;
+                    console.log('[RejectionChat] URL do áudio salva no BD');
                 }
             }
 
-            // Atualizar status do post para REPROVADO
             const now = new Date().toISOString();
-            
             const { error: updateError } = await window.supabaseClient
                 .from('post')
                 .update({
@@ -424,18 +503,15 @@ export class RejectionChat {
             
             if (updateError) throw updateError;
             
-            console.log('[RejectionChat] Post recusado com sucesso');
-            
-            // Fechar modal
+            console.log('[RejectionChat] Post marcado como reprovado');
             this.close();
             
-            // Disparar evento customizado para remover o card
             const event = new CustomEvent('post-rejected', { detail: { postId: this.postId } });
             document.dispatchEvent(event);
             
         } catch (error) {
-            console.error('[RejectionChat] Erro ao rejeitar post:', error);
-            alert('Erro ao rejeitar post. Tente novamente.');
+            console.error('[RejectionChat] Erro:', error);
+            alert('Erro ao processar rejeição: ' + error.message);
             btn.disabled = false;
             btn.innerHTML = originalHTML;
         }
@@ -456,13 +532,11 @@ export class RejectionChat {
         const modal = document.getElementById('rejection-chat-modal');
         if (!modal) return;
 
-        // Parar gravação se estiver ativa
         if (this.isRecording) {
             this.cancelRecording();
         }
 
         modal.classList.remove('active');
-        
         setTimeout(() => {
             modal.remove();
             document.body.style.overflow = '';
