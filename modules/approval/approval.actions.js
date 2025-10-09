@@ -162,6 +162,7 @@ export class ApprovalActions {
                 .in('id_client', this.clientIds)
                 .neq('status', 'APROVADO')
                 .neq('status', 'REPROVADO')
+                .neq('status', 'PUBLICADO')
                 .order('agendamento', { ascending: false });
 
             if (error) throw error;
@@ -696,3 +697,4 @@ export class ApprovalActions {
         });
     }
 }
+
