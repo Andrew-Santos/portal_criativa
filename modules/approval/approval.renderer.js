@@ -15,7 +15,9 @@ export class ApprovalRenderer {
                             <i class="ph ph-users"></i>
                             Portal do Cliente
                         </h1>
-                        <p class="header-subtitle">@${this.getUsernames()}</p>
+                        <div class="header-usernames">
+                            ${this.getUsernames()}
+                        </div>
                     </div>
                     <img id="logo" src="./assets/images/logo.webp" alt="Logo">
                 </header>
@@ -47,12 +49,11 @@ export class ApprovalRenderer {
     }
 
     getUsernames() {
-        const clients = this.actions.authData.clients;
-        if (clients.length === 1) {
-            return clients[0].users;
-        }
-        return clients.map(c => c.users).join(', ');
-    }
+    const clients = this.actions.authData.clients;
+    const usernames = clients.flatMap(c => Array.isArray(c.users) ? c.users : [c.users]);
+    return usernames.map(u => `<div>@${u}</div>`).join('');
+}
+
 
     renderPosts(posts) {
         const content = document.getElementById('tab-content');

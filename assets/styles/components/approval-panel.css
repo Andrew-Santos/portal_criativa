@@ -257,10 +257,11 @@ body {
     margin-bottom: 4px;
 }
 
-.header-subtitle {
+.header-usernames {
     font-size: 13px;
     opacity: 0.85;
     font-weight: 400;
+    color: #cecece;
 }
 
 /* ===== TABS NAVIGATION ===== */
