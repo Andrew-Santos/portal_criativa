@@ -313,6 +313,7 @@ export class ApprovalActions {
             document.querySelectorAll('.media-video').forEach(v => {
                 if (v !== video && !v.paused) {
                     v.pause();
+                    v.currentTime = 0; // Voltar ao primeiro frame
                     const otherOverlay = v.parentElement.querySelector('.video-play-overlay');
                     if (otherOverlay) otherOverlay.style.display = 'flex';
                 }
@@ -323,10 +324,11 @@ export class ApprovalActions {
             if (overlay) overlay.style.display = 'none';
             console.log('[ApprovalActions] Vídeo iniciado');
         } else {
-            // Pause
+            // Pause e voltar ao primeiro frame
             video.pause();
+            video.currentTime = 0; // Voltar ao primeiro frame
             if (overlay) overlay.style.display = 'flex';
-            console.log('[ApprovalActions] Vídeo pausado');
+            console.log('[ApprovalActions] Vídeo pausado e resetado');
         }
     }
 
@@ -657,11 +659,12 @@ export class ApprovalActions {
                 const video = entry.target;
                 const overlay = video.parentElement.querySelector('.video-play-overlay');
                 
-                // Se o vídeo sair do viewport, pausar e mostrar overlay
+                // Se o vídeo sair do viewport, pausar, resetar e mostrar overlay
                 if (!entry.isIntersecting && !video.paused) {
                     video.pause();
+                    video.currentTime = 0; // Voltar ao primeiro frame
                     if (overlay) overlay.style.display = 'flex';
-                    console.log('[ApprovalActions] Vídeo saiu do viewport - pausado');
+                    console.log('[ApprovalActions] Vídeo saiu do viewport - pausado e resetado');
                 }
             });
         }, observerOptions);

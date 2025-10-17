@@ -1,4 +1,4 @@
-// Approval Renderer - Renderização da interface (SEM indicador de som)
+// Approval Renderer - Renderização da interface
 export class ApprovalRenderer {
     constructor(actions) {
         this.actions = actions;
@@ -196,6 +196,10 @@ export class ApprovalRenderer {
                     <div class="video-play-overlay">
                         <i class="ph-fill ph-play-circle"></i>
                     </div>
+                    
+                    <div class="video-sound-indicator muted">
+                        <i class="ph-fill ph-speaker-slash"></i>
+                    </div>
                 ` : `
                     <img 
                         src="${media.url_media}" 
@@ -228,17 +232,12 @@ export class ApprovalRenderer {
                                     <video 
                                         src="${media.url_media}#t=0.001" 
                                         class="media-video" 
+                                        controls
                                         playsinline
-                                        loop
-                                        muted
                                         preload="metadata"
                                         poster="">
                                         Seu navegador não suporta vídeo.
                                     </video>
-                                    
-                                    <div class="video-play-overlay">
-                                        <i class="ph-fill ph-play-circle"></i>
-                                    </div>
                                 ` : `
                                     <img 
                                         src="${media.url_media}" 
