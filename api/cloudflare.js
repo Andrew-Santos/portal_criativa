@@ -1,5 +1,5 @@
-// api/cloudflare.js - Com Presigned URLs
-const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+// api/cloudflare.js - Com Presigned URLs + Multipart Seguro
+const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 // Configuração do Cloudflare R2
@@ -26,7 +26,11 @@ const ALLOWED_TYPES = {
     'video/x-msvideo': '.avi'
 };
 
-const MAX_FILE_SIZE = 150 * 1024 * 1024; // 100MB
+const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150MB
+
+// Store para manter track de multipart uploads em progresso
+// Em produção, use Redis ou banco de dados
+const multipartSessions = new Map();
 
 const readBody = (req) => {
     return new Promise((resolve, reject) => {
@@ -67,22 +71,23 @@ module.exports = async (req, res) => {
         console.log('Health check OK');
         res.status(200).json({ 
             status: 'ok', 
-            service: 'Cloudflare R2 API with Presigned URLs', 
+            service: 'Cloudflare R2 API with Multipart Support', 
             timestamp: new Date().toISOString() 
         });
         return;
     }
 
     // ============================================
-    // NOVO: Gerar Presigned URL para upload único
+    // EXISTENTES - NÃO MODIFICAR
     // ============================================
+    
+    // Gerar Presigned URL para upload único
     if (req.method === 'POST' && req.url.includes('/generate-upload-url')) {
         try {
             console.log('Gerando presigned URL para upload único');
             const body = await readBody(req);
             const { fileName, contentType, fileSize } = body;
 
-            // Validações
             if (!fileName) {
                 return res.status(400).json({ error: 'Nome do arquivo não fornecido' });
             }
@@ -108,14 +113,12 @@ module.exports = async (req, res) => {
             console.log('Tipo:', contentType);
             console.log('Tamanho:', fileSize ? `${(fileSize / 1024 / 1024).toFixed(2)}MB` : 'não informado');
 
-            // Criar comando para upload
             const command = new PutObjectCommand({
                 Bucket: BUCKET_NAME,
                 Key: fileName,
                 ContentType: contentType
             });
 
-            // Gerar URL assinada (válida por 15 minutos)
             const uploadUrl = await getSignedUrl(R2, command, { 
                 expiresIn: 900 
             });
@@ -140,9 +143,7 @@ module.exports = async (req, res) => {
         return;
     }
 
-    // ============================================
-    // NOVO: Gerar Presigned URLs para múltiplos uploads
-    // ============================================
+    // Gerar Presigned URLs para múltiplos uploads
     if (req.method === 'POST' && req.url.includes('/generate-upload-urls')) {
         try {
             console.log('Gerando presigned URLs para múltiplos uploads');
@@ -160,7 +161,6 @@ module.exports = async (req, res) => {
             for (const file of files) {
                 const { fileName, contentType, fileSize } = file;
 
-                // Validações
                 if (!fileName || !contentType) {
                     return res.status(400).json({ 
                         error: 'Arquivo inválido',
@@ -182,14 +182,12 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                // Criar comando para upload
                 const command = new PutObjectCommand({
                     Bucket: BUCKET_NAME,
                     Key: fileName,
                     ContentType: contentType
                 });
 
-                // Gerar URL assinada
                 const uploadUrl = await getSignedUrl(R2, command, { 
                     expiresIn: 900 
                 });
@@ -219,9 +217,7 @@ module.exports = async (req, res) => {
         return;
     }
 
-    // ============================================
-    // NOVO: Verificar se arquivo existe no R2
-    // ============================================
+    // Verificar se arquivo existe no R2
     if (req.method === 'POST' && req.url.includes('/verify-upload')) {
         try {
             console.log('Verificando se arquivo existe no R2');
@@ -270,9 +266,7 @@ module.exports = async (req, res) => {
         return;
     }
 
-    // ============================================
     // Delete único
-    // ============================================
     if (req.method === 'DELETE' && req.url.includes('/delete/')) {
         try {
             const urlParts = req.url.split('/delete/');
@@ -304,9 +298,7 @@ module.exports = async (req, res) => {
         return;
     }
 
-    // ============================================
     // Delete múltiplo
-    // ============================================
     if (req.method === 'POST' && req.url.includes('/delete-multiple')) {
         try {
             const body = await readBody(req);
@@ -344,6 +336,278 @@ module.exports = async (req, res) => {
         return;
     }
 
+    // ============================================
+    // NOVAS ROTAS - MULTIPART UPLOAD
+    // ============================================
+
+    // 1. Iniciar multipart upload
+    if (req.method === 'POST' && req.url.includes('/multipart/initiate')) {
+        try {
+            console.log('[Multipart] Iniciando upload');
+            const body = await readBody(req);
+            const { fileName, contentType, fileSize } = body;
+
+            if (!fileName || !contentType) {
+                return res.status(400).json({ error: 'fileName e contentType obrigatórios' });
+            }
+
+            if (!ALLOWED_TYPES[contentType]) {
+                return res.status(400).json({ 
+                    error: 'Tipo de arquivo não permitido',
+                    allowedTypes: Object.keys(ALLOWED_TYPES)
+                });
+            }
+
+            if (fileSize && fileSize > MAX_FILE_SIZE) {
+                return res.status(400).json({ 
+                    error: `Arquivo muito grande. Máximo: ${MAX_FILE_SIZE / 1024 / 1024}MB`
+                });
+            }
+
+            console.log(`[Multipart] Arquivo: ${fileName}, Tipo: ${contentType}, Tamanho: ${(fileSize / 1024 / 1024).toFixed(2)}MB`);
+
+            // Iniciar multipart upload no R2
+            const initiateCommand = new CreateMultipartUploadCommand({
+                Bucket: BUCKET_NAME,
+                Key: fileName,
+                ContentType: contentType
+            });
+
+            const initiateResult = await R2.send(initiateCommand);
+            const uploadId = initiateResult.UploadId;
+
+            console.log(`[Multipart] Upload ID: ${uploadId}`);
+
+            // Armazenar sessão (em produção, usar Redis com TTL de 24h)
+            multipartSessions.set(uploadId, {
+                fileName,
+                contentType,
+                fileSize,
+                parts: [],
+                createdAt: Date.now(),
+                expiresAt: Date.now() + 86400000 // 24 horas
+            });
+
+            res.status(200).json({
+                success: true,
+                uploadId: uploadId,
+                fileName: fileName,
+                message: 'Multipart upload iniciado'
+            });
+
+        } catch (error) {
+            console.error('[Multipart] Erro ao iniciar:', error);
+            res.status(500).json({ 
+                error: 'Erro ao iniciar multipart upload',
+                details: error.message
+            });
+        }
+        return;
+    }
+
+    // 2. Gerar presigned URL para um part específico
+    if (req.method === 'POST' && req.url.includes('/multipart/get-part-url')) {
+        try {
+            console.log('[Multipart] Gerando URL para part');
+            const body = await readBody(req);
+            const { uploadId, partNumber } = body;
+
+            if (!uploadId || !partNumber) {
+                return res.status(400).json({ error: 'uploadId e partNumber obrigatórios' });
+            }
+
+            // Verificar se sessão existe
+            const session = multipartSessions.get(uploadId);
+            if (!session) {
+                return res.status(404).json({ error: 'Upload ID não encontrado ou expirado' });
+            }
+
+            console.log(`[Multipart] Upload: ${session.fileName}, Part: ${partNumber}`);
+
+            // Gerar presigned URL para UploadPart
+            const uploadPartCommand = new UploadPartCommand({
+                Bucket: BUCKET_NAME,
+                Key: session.fileName,
+                UploadId: uploadId,
+                PartNumber: partNumber
+            });
+
+            const partUrl = await getSignedUrl(R2, uploadPartCommand, { 
+                expiresIn: 3600 // 1 hora
+            });
+
+            console.log(`[Multipart] URL gerada para part ${partNumber}`);
+
+            res.status(200).json({
+                success: true,
+                uploadId: uploadId,
+                partNumber: partNumber,
+                uploadUrl: partUrl,
+                expiresIn: 3600
+            });
+
+        } catch (error) {
+            console.error('[Multipart] Erro ao gerar URL de part:', error);
+            res.status(500).json({ 
+                error: 'Erro ao gerar URL de part',
+                details: error.message
+            });
+        }
+        return;
+    }
+
+    // 3. Registrar part completo (ETag)
+    if (req.method === 'POST' && req.url.includes('/multipart/register-part')) {
+        try {
+            console.log('[Multipart] Registrando part');
+            const body = await readBody(req);
+            const { uploadId, partNumber, eTag } = body;
+
+            if (!uploadId || !partNumber || !eTag) {
+                return res.status(400).json({ error: 'uploadId, partNumber e eTag obrigatórios' });
+            }
+
+            // Verificar se sessão existe
+            const session = multipartSessions.get(uploadId);
+            if (!session) {
+                return res.status(404).json({ error: 'Upload ID não encontrado' });
+            }
+
+            console.log(`[Multipart] Part ${partNumber} registrada (ETag: ${eTag})`);
+
+            // Armazenar part info
+            session.parts.push({
+                partNumber: parseInt(partNumber),
+                eTag: eTag
+            });
+
+            // Ordenar por número
+            session.parts.sort((a, b) => a.partNumber - b.partNumber);
+
+            res.status(200).json({
+                success: true,
+                uploadId: uploadId,
+                partNumber: partNumber,
+                totalParts: session.parts.length
+            });
+
+        } catch (error) {
+            console.error('[Multipart] Erro ao registrar part:', error);
+            res.status(500).json({ 
+                error: 'Erro ao registrar part',
+                details: error.message
+            });
+        }
+        return;
+    }
+
+    // 4. Completar multipart upload
+    if (req.method === 'POST' && req.url.includes('/multipart/complete')) {
+        try {
+            console.log('[Multipart] Completando upload');
+            const body = await readBody(req);
+            const { uploadId } = body;
+
+            if (!uploadId) {
+                return res.status(400).json({ error: 'uploadId obrigatório' });
+            }
+
+            // Verificar se sessão existe
+            const session = multipartSessions.get(uploadId);
+            if (!session) {
+                return res.status(404).json({ error: 'Upload ID não encontrado' });
+            }
+
+            if (session.parts.length === 0) {
+                return res.status(400).json({ error: 'Nenhum part foi enviado' });
+            }
+
+            console.log(`[Multipart] Completando: ${session.fileName}, Parts: ${session.parts.length}`);
+
+            // Completar multipart upload
+            const completeCommand = new CompleteMultipartUploadCommand({
+                Bucket: BUCKET_NAME,
+                Key: session.fileName,
+                UploadId: uploadId,
+                MultipartUpload: {
+                    Parts: session.parts.map(p => ({
+                        PartNumber: p.partNumber,
+                        ETag: p.eTag
+                    }))
+                }
+            });
+
+            const completeResult = await R2.send(completeCommand);
+
+            console.log(`[Multipart] Upload completado: ${session.fileName}`);
+
+            // Limpar sessão
+            multipartSessions.delete(uploadId);
+
+            res.status(200).json({
+                success: true,
+                uploadId: uploadId,
+                fileName: session.fileName,
+                publicUrl: `${R2_PUBLIC_URL}/${session.fileName}`,
+                message: `Arquivo completado com ${session.parts.length} parts`
+            });
+
+        } catch (error) {
+            console.error('[Multipart] Erro ao completar:', error);
+            res.status(500).json({ 
+                error: 'Erro ao completar multipart upload',
+                details: error.message
+            });
+        }
+        return;
+    }
+
+    // 5. Cancelar multipart upload (cleanup)
+    if (req.method === 'POST' && req.url.includes('/multipart/abort')) {
+        try {
+            console.log('[Multipart] Abortando upload');
+            const body = await readBody(req);
+            const { uploadId } = body;
+
+            if (!uploadId) {
+                return res.status(400).json({ error: 'uploadId obrigatório' });
+            }
+
+            const session = multipartSessions.get(uploadId);
+            if (!session) {
+                return res.status(404).json({ error: 'Upload ID não encontrado' });
+            }
+
+            console.log(`[Multipart] Abortando: ${session.fileName}`);
+
+            // Abortar no R2
+            const abortCommand = new AbortMultipartUploadCommand({
+                Bucket: BUCKET_NAME,
+                Key: session.fileName,
+                UploadId: uploadId
+            });
+
+            await R2.send(abortCommand);
+
+            // Limpar sessão
+            multipartSessions.delete(uploadId);
+
+            res.status(200).json({
+                success: true,
+                uploadId: uploadId,
+                message: 'Upload cancelado e limpo'
+            });
+
+        } catch (error) {
+            console.error('[Multipart] Erro ao abortar:', error);
+            res.status(500).json({ 
+                error: 'Erro ao abortar multipart upload',
+                details: error.message
+            });
+        }
+        return;
+    }
+
     // Rota não encontrada
     console.log('Rota não encontrada');
     res.status(404).json({ 
@@ -356,10 +620,12 @@ module.exports = async (req, res) => {
             'POST /verify-upload',
             'DELETE /delete/:fileName',
             'POST /delete-multiple',
+            'POST /multipart/initiate',
+            'POST /multipart/get-part-url',
+            'POST /multipart/register-part',
+            'POST /multipart/complete',
+            'POST /multipart/abort',
             'GET /health'
         ]
     });
-
 };
-
-
