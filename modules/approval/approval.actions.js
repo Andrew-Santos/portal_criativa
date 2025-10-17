@@ -163,7 +163,7 @@ export class ApprovalActions {
                 .neq('status', 'APROVADO')
                 .neq('status', 'REPROVADO')
                 .neq('status', 'PUBLICADO')
-                .order('agendamento', { ascending: false });
+                .order('agendamento', { ascending: true });
 
             if (error) throw error;
             return data || [];
@@ -698,3 +698,4 @@ export class ApprovalActions {
     }
 
 }
+
