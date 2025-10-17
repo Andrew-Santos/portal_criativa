@@ -1,4 +1,4 @@
-// Approval Renderer - Renderização da interface
+// Approval Renderer - Renderização da interface (SEM indicador de som)
 export class ApprovalRenderer {
     constructor(actions) {
         this.actions = actions;
@@ -49,11 +49,10 @@ export class ApprovalRenderer {
     }
 
     getUsernames() {
-    const clients = this.actions.authData.clients;
-    const usernames = clients.flatMap(c => Array.isArray(c.users) ? c.users : [c.users]);
-    return usernames.map(u => `<div>@${u}</div>`).join('');
-}
-
+        const clients = this.actions.authData.clients;
+        const usernames = clients.flatMap(c => Array.isArray(c.users) ? c.users : [c.users]);
+        return usernames.map(u => `<div>@${u}</div>`).join('');
+    }
 
     renderPosts(posts) {
         const content = document.getElementById('tab-content');
@@ -167,106 +166,110 @@ export class ApprovalRenderer {
     }
 
     createSinglePreview(media, aspectRatio, postType) {
-    if (!media) {
+        if (!media) {
+            return `
+                <div class="media-preview" style="aspect-ratio: ${aspectRatio};">
+                    <div class="media-placeholder">
+                        <i class="ph ph-image"></i>
+                        <p>Sem mídia</p>
+                    </div>
+                    <span class="post-type-label">${this.getPostTypeLabel(postType)}</span>
+                </div>
+            `;
+        }
+
+        const isVideo = media.type === 'video';
+        
         return `
             <div class="media-preview" style="aspect-ratio: ${aspectRatio};">
-                <div class="media-placeholder">
-                    <i class="ph ph-image"></i>
-                    <p>Sem mídia</p>
-                </div>
+                ${isVideo ? `
+                    <video 
+                        src="${media.url_media}#t=0.001" 
+                        class="media-video" 
+                        playsinline
+                        loop
+                        preload="metadata"
+                        poster="">
+                        Seu navegador não suporta vídeo.
+                    </video>
+                    
+                    <div class="video-play-overlay">
+                        <i class="ph-fill ph-play-circle"></i>
+                    </div>
+                ` : `
+                    <img 
+                        src="${media.url_media}" 
+                        alt="Mídia" 
+                        class="media-image"
+                        loading="lazy">
+                `}
+
                 <span class="post-type-label">${this.getPostTypeLabel(postType)}</span>
             </div>
         `;
     }
 
-    const isVideo = media.type === 'video';
-    
-    return `
-        <div class="media-preview" style="aspect-ratio: ${aspectRatio};">
-            ${isVideo ? `
-                <video 
-                    src="${media.url_media}" 
-                    class="media-video" 
-                    playsinline
-                    autoplay
-                    loop
-                    muted
-                    preload="metadata">
-                    Seu navegador não suporta vídeo.
-                </video>
-                
-                <div class="video-sound-indicator muted">
-                    <i class="ph-fill ph-speaker-slash"></i>
+    createCarouselPreview(medias, postId, aspectRatio, postType) {
+        if (!medias || medias.length === 0) {
+            return this.createSinglePreview(null, aspectRatio, postType);
+        }
+
+        const sortedMedias = [...medias].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        return `
+            <div class="media-preview carousel-container" data-carousel-id="${postId}" style="aspect-ratio: ${aspectRatio};">
+                <div class="carousel-track">
+                    ${sortedMedias.map((media, index) => {
+                        const isVideo = media.type === 'video';
+                        
+                        return `
+                            <div class="carousel-item ${index === 0 ? 'active' : ''}" data-index="${index}">
+                                ${isVideo ? `
+                                    <video 
+                                        src="${media.url_media}#t=0.001" 
+                                        class="media-video" 
+                                        playsinline
+                                        loop
+                                        muted
+                                        preload="metadata"
+                                        poster="">
+                                        Seu navegador não suporta vídeo.
+                                    </video>
+                                    
+                                    <div class="video-play-overlay">
+                                        <i class="ph-fill ph-play-circle"></i>
+                                    </div>
+                                ` : `
+                                    <img 
+                                        src="${media.url_media}" 
+                                        alt="Mídia ${index + 1}" 
+                                        class="media-image"
+                                        loading="lazy">
+                                `}
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
-            ` : `
-                <img 
-                    src="${media.url_media}" 
-                    alt="Mídia" 
-                    class="media-image"
-                    loading="lazy">
-            `}
-
-            <span class="post-type-label">${this.getPostTypeLabel(postType)}</span>
-        </div>
-    `;
-}
-
-createCarouselPreview(medias, postId, aspectRatio, postType) {
-    if (!medias || medias.length === 0) {
-        return this.createSinglePreview(null, aspectRatio, postType);
-    }
-
-    const sortedMedias = [...medias].sort((a, b) => (a.order || 0) - (b.order || 0));
-
-    return `
-        <div class="media-preview carousel-container" data-carousel-id="${postId}" style="aspect-ratio: ${aspectRatio};">
-            <div class="carousel-track">
-                ${sortedMedias.map((media, index) => {
-                    const isVideo = media.type === 'video';
+                
+                ${sortedMedias.length > 1 ? `
+                    <button class="carousel-btn carousel-prev" data-carousel="${postId}">
+                        <i class="ph-bold ph-caret-left"></i>
+                    </button>
+                    <button class="carousel-btn carousel-next" data-carousel="${postId}">
+                        <i class="ph-bold ph-caret-right"></i>
+                    </button>
                     
-                    return `
-                        <div class="carousel-item ${index === 0 ? 'active' : ''}" data-index="${index}">
-                            ${isVideo ? `
-                                <video 
-                                    src="${media.url_media}" 
-                                    class="media-video" 
-                                    controls
-                                    playsinline
-                                    preload="metadata">
-                                    Seu navegador não suporta vídeo.
-                                </video>
-                            ` : `
-                                <img 
-                                    src="${media.url_media}" 
-                                    alt="Mídia ${index + 1}" 
-                                    class="media-image"
-                                    loading="lazy">
-                            `}
-                        </div>
-                    `;
-                }).join('')}
+                    <div class="carousel-indicators">
+                        ${sortedMedias.map((_, index) => `
+                            <span class="indicator ${index === 0 ? 'active' : ''}" data-index="${index}"></span>
+                        `).join('')}
+                    </div>
+                ` : ''}
+
+                <span class="post-type-label">${this.getPostTypeLabel(postType)}</span>
             </div>
-            
-            ${sortedMedias.length > 1 ? `
-                <button class="carousel-btn carousel-prev" data-carousel="${postId}">
-                    <i class="ph-bold ph-caret-left"></i>
-                </button>
-                <button class="carousel-btn carousel-next" data-carousel="${postId}">
-                    <i class="ph-bold ph-caret-right"></i>
-                </button>
-                
-                <div class="carousel-indicators">
-                    ${sortedMedias.map((_, index) => `
-                        <span class="indicator ${index === 0 ? 'active' : ''}" data-index="${index}"></span>
-                    `).join('')}
-                </div>
-            ` : ''}
-
-            <span class="post-type-label">${this.getPostTypeLabel(postType)}</span>
-        </div>
-    `;
-}
-
+        `;
+    }
 
     getPostTypeLabel(type) {
         const labels = {

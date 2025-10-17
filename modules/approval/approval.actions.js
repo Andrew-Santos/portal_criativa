@@ -74,10 +74,16 @@ export class ApprovalActions {
                 this.handleExpandCaption(expandBtn);
             }
 
+            // Novo: Clique no vídeo ou no overlay de play
+            const videoOverlay = e.target.closest('.video-play-overlay');
             const video = e.target.closest('.media-video');
-            if (video) {
+            
+            if (videoOverlay || video) {
                 e.stopPropagation();
-                this.handleVideoToggleMute(video);
+                const videoElement = videoOverlay 
+                    ? videoOverlay.previousElementSibling 
+                    : video;
+                this.handleVideoClick(videoElement);
             }
         });
 
@@ -227,12 +233,11 @@ export class ApprovalActions {
         items.forEach((item, index) => {
             const video = item.querySelector('video');
             if (video) {
-                if (index === newIndex) {
-                    video.currentTime = 0;
-                } else {
-                    video.pause();
-                    video.currentTime = 0;
-                }
+                video.pause();
+                video.currentTime = 0;
+                // Esconder overlay de play
+                const overlay = video.parentElement.querySelector('.video-play-overlay');
+                if (overlay) overlay.style.display = 'flex';
             }
         });
     }
@@ -286,14 +291,66 @@ export class ApprovalActions {
         items.forEach((item, index) => {
             const video = item.querySelector('video');
             if (video) {
-                if (index === newIndex) {
-                    video.currentTime = 0;
-                } else {
-                    video.pause();
-                    video.currentTime = 0;
-                }
+                video.pause();
+                video.currentTime = 0;
+                // Esconder overlay de play
+                const overlay = video.parentElement.querySelector('.video-play-overlay');
+                if (overlay) overlay.style.display = 'flex';
             }
         });
+    }
+
+    /**
+     * Novo método: Gerencia clique no vídeo para play/pause
+     */
+    handleVideoClick(video) {
+        if (!video) return;
+
+        const overlay = video.parentElement.querySelector('.video-play-overlay');
+        
+        if (video.paused) {
+            // Pausar todos os outros vídeos
+            document.querySelectorAll('.media-video').forEach(v => {
+                if (v !== video && !v.paused) {
+                    v.pause();
+                    const otherOverlay = v.parentElement.querySelector('.video-play-overlay');
+                    if (otherOverlay) otherOverlay.style.display = 'flex';
+                }
+            });
+
+            // Play no vídeo clicado
+            video.play();
+            if (overlay) overlay.style.display = 'none';
+            console.log('[ApprovalActions] Vídeo iniciado');
+        } else {
+            // Pause
+            video.pause();
+            if (overlay) overlay.style.display = 'flex';
+            console.log('[ApprovalActions] Vídeo pausado');
+        }
+    }
+
+    /**
+     * Modificado: Gerencia toggle de mudo (clique longo ou botão específico)
+     */
+    handleVideoToggleMute(video) {
+        const indicator = video.parentElement.querySelector('.video-sound-indicator');
+        
+        if (video.muted) {
+            video.muted = false;
+            if (indicator) {
+                indicator.classList.remove('muted');
+                indicator.innerHTML = '<i class="ph-fill ph-speaker-high"></i>';
+            }
+            console.log('[ApprovalActions] Vídeo com som');
+        } else {
+            video.muted = true;
+            if (indicator) {
+                indicator.classList.add('muted');
+                indicator.innerHTML = '<i class="ph-fill ph-speaker-slash"></i>';
+            }
+            console.log('[ApprovalActions] Vídeo mutado');
+        }
     }
 
     async handleApprove(button) {
@@ -381,25 +438,10 @@ export class ApprovalActions {
         }
     }
 
-    /**
-     * Gerencia o download de mídias de um post
-     * @param {HTMLElement} button - Botão de download clicado
-     * 
-     * Fluxo:
-     * 1. Identifica o post e valida se possui mídias
-     * 2. Desabilita o botão e mostra feedback visual
-     * 3. Ordena as mídias pela ordem correta
-     * 4. Para UMA mídia: tenta baixar via blob (bypass CORS)
-     * 5. Para MÚLTIPLAS mídias: tenta criar ZIP com todas
-     * 6. Se CORS bloquear: fallback para abrir em nova aba ou modal com links
-     * 7. Restaura o botão ao estado original
-     */
     async handleDownload(button) {
-        // 1. IDENTIFICAR POST E VALIDAR MÍDIAS
-        const postId = button.dataset.postId; // Pega o ID do post do atributo data-post-id
-        const post = this.posts.find(p => p.id == postId); // Busca o post completo na lista
+        const postId = button.dataset.postId;
+        const post = this.posts.find(p => p.id == postId);
 
-        // Se não encontrou o post ou não tem mídias, aborta
         if (!post || !post.post_media || post.post_media.length === 0) {
             alert('Nenhuma mídia disponível para download.');
             return;
@@ -407,125 +449,88 @@ export class ApprovalActions {
 
         console.log('[ApprovalActions] Iniciando download para o post:', postId);
 
-        // 2. DESABILITAR BOTÃO E MOSTRAR FEEDBACK VISUAL
-        button.disabled = true; // Impede cliques múltiplos
-        const originalHTML = button.innerHTML; // Salva conteúdo original para restaurar depois
-        button.innerHTML = '<div class="btn-spinner"></div> Baixando...'; // Mostra spinner animado
+        button.disabled = true;
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<div class="btn-spinner"></div> Baixando...';
 
         try {
-            // 3. ORDENAR MÍDIAS PELA ORDEM CORRETA
-            // Ordena as mídias pelo campo 'order' (mídias sem order ficam no início)
             const medias = post.post_media.sort((a, b) => (a.order || 0) - (b.order || 0));
 
-            // 4. DOWNLOAD DE UMA ÚNICA MÍDIA
             if (medias.length === 1) {
                 const media = medias[0];
-                // Define extensão baseada no tipo (video = mp4, imagem = jpg)
                 const extension = media.type === 'video' ? 'mp4' : 'jpg';
                 const filename = `post_${postId}_media.${extension}`;
                 
                 try {
-                    // TENTA BAIXAR VIA BLOB (método mais confiável)
-                    // Faz fetch da mídia, converte para blob e força download
                     await this.downloadMediaAsBlob(media.url_media, filename);
                 } catch (corsError) {
-                    // SE CORS BLOQUEAR: abre em nova aba como fallback
                     console.warn('[ApprovalActions] CORS bloqueou fetch, abrindo em nova aba');
                     window.open(media.url_media, '_blank');
                     alert('Download bloqueado por CORS. A mídia foi aberta em nova aba. Use "Salvar como..." para baixar.');
                 }
             } 
-            // 5. DOWNLOAD DE MÚLTIPLAS MÍDIAS
             else {
                 try {
-                    // TENTA CRIAR UM ARQUIVO ZIP com todas as mídias
-                    // Usa a biblioteca JSZip para empacotar tudo
                     await this.downloadMultipleMediasAsZip(medias, postId);
                 } catch (corsError) {
-                    // SE CORS BLOQUEAR: mostra modal com links individuais
                     console.warn('[ApprovalActions] CORS bloqueou ZIP, mostrando links');
                     this.showMediaLinksModal(medias, postId);
                 }
             }
         } catch (error) {
-            // TRATAMENTO DE ERRO GERAL
             console.error('[ApprovalActions] Erro durante o download:', error);
             alert('Ocorreu um erro ao tentar baixar a mídia.');
         } finally {
-            // 7. SEMPRE RESTAURAR O BOTÃO (mesmo se der erro)
-            button.disabled = false; // Reabilita o botão
-            button.innerHTML = originalHTML; // Restaura texto/ícone original
+            button.disabled = false;
+            button.innerHTML = originalHTML;
         }
     }
 
-    /**
-     * Baixa uma mídia individual usando fetch + blob
-     * Este método tenta fazer bypass de CORS convertendo a resposta para blob
-     * @param {string} url - URL da mídia
-     * @param {string} filename - Nome do arquivo para download
-     */
     async downloadMediaAsBlob(url, filename) {
         try {
-            // Faz requisição para buscar a mídia
             const response = await fetch(url);
             
-            // Se a resposta não for OK (200-299), lança erro
             if (!response.ok) {
                 throw new Error(`Falha na rede ao buscar a mídia: ${response.statusText}`);
             }
             
-            // Converte a resposta para blob (Binary Large Object)
             const blob = await response.blob();
-            
-            // Cria uma URL temporária do blob
             const objectUrl = URL.createObjectURL(blob);
             
-            // Cria elemento <a> invisível para forçar download
             const a = document.createElement('a');
             a.href = objectUrl;
-            a.download = filename; // Nome do arquivo
+            a.download = filename;
             document.body.appendChild(a);
-            a.click(); // Simula clique para iniciar download
+            a.click();
             document.body.removeChild(a);
             
-            // Libera a memória da URL temporária
             URL.revokeObjectURL(objectUrl);
         } catch (error) {
             console.error(`[ApprovalActions] Erro no fetch de ${url}:`, error);
-            throw error; // Repassa o erro para tratamento superior
+            throw error;
         }
     }
 
-    /**
-     * Baixa múltiplas mídias em um arquivo ZIP
-     * @param {Array} medias - Array de objetos de mídia
-     * @param {string} postId - ID do post
-     */
     async downloadMultipleMediasAsZip(medias, postId) {
-        // Verifica se a biblioteca JSZip está carregada
         if (typeof JSZip === 'undefined') {
             alert('Erro: A biblioteca JSZip não foi carregada.');
             throw new Error("JSZip não está definido");
         }
 
-        // Cria nova instância do ZIP
         const zip = new JSZip();
         const zipFilename = `post_${postId}_midias.zip`;
 
-        // Cria array de promises para baixar todas as mídias em paralelo
         const promises = medias.map(async (media) => {
             const response = await fetch(media.url_media);
-            if (!response.ok) return null; // Se falhar, retorna null
+            if (!response.ok) return null;
             return {
                 blob: await response.blob(),
                 type: media.type
             };
         });
 
-        // Aguarda todas as promises resolverem
         const results = await Promise.all(promises);
 
-        // Adiciona cada mídia ao ZIP
         results.forEach((result, index) => {
             if (result) {
                 const extension = result.type === 'video' ? 'mp4' : 'png';
@@ -534,10 +539,8 @@ export class ApprovalActions {
             }
         });
 
-        // Gera o arquivo ZIP
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         
-        // Cria URL temporária e força download
         const objectUrl = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
         a.href = objectUrl;
@@ -548,11 +551,6 @@ export class ApprovalActions {
         URL.revokeObjectURL(objectUrl);
     }
 
-    /**
-     * Mostra modal com links para download manual (usado no mobile quando CORS bloqueia)
-     * @param {Array} medias - Array de mídias
-     * @param {string} postId - ID do post
-     */
     showMediaLinksModal(medias, postId) {
         const modal = document.createElement('div');
         modal.className = 'media-links-modal';
@@ -582,12 +580,10 @@ export class ApprovalActions {
 
         document.body.appendChild(modal);
 
-        // Fechar modal ao clicar no botão
         modal.querySelector('.btn-close-modal').addEventListener('click', () => {
             modal.remove();
         });
 
-        // Fechar modal ao clicar no overlay
         modal.querySelector('.modal-overlay').addEventListener('click', () => {
             modal.remove();
         });
@@ -649,26 +645,6 @@ export class ApprovalActions {
         }
     }
 
-    handleVideoToggleMute(video) {
-        const indicator = video.parentElement.querySelector('.video-sound-indicator');
-        
-        if (video.muted) {
-            video.muted = false;
-            if (indicator) {
-                indicator.classList.remove('muted');
-                indicator.innerHTML = '<i class="ph-fill ph-speaker-high"></i>';
-            }
-            console.log('[ApprovalActions] Vídeo com som');
-        } else {
-            video.muted = true;
-            if (indicator) {
-                indicator.classList.add('muted');
-                indicator.innerHTML = '<i class="ph-fill ph-speaker-slash"></i>';
-            }
-            console.log('[ApprovalActions] Vídeo mutado');
-        }
-    }
-
     attachVideoObservers() {
         const observerOptions = {
             root: null,
@@ -679,15 +655,13 @@ export class ApprovalActions {
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 const video = entry.target;
-                const indicator = video.parentElement.querySelector('.video-sound-indicator');
+                const overlay = video.parentElement.querySelector('.video-play-overlay');
                 
-                if (!entry.isIntersecting && !video.muted) {
-                    video.muted = true;
-                    if (indicator) {
-                        indicator.classList.add('muted');
-                        indicator.innerHTML = '<i class="ph-fill ph-speaker-slash"></i>';
-                    }
-                    console.log('[ApprovalActions] Vídeo saiu do viewport - mutado');
+                // Se o vídeo sair do viewport, pausar e mostrar overlay
+                if (!entry.isIntersecting && !video.paused) {
+                    video.pause();
+                    if (overlay) overlay.style.display = 'flex';
+                    console.log('[ApprovalActions] Vídeo saiu do viewport - pausado');
                 }
             });
         }, observerOptions);
@@ -696,6 +670,4 @@ export class ApprovalActions {
             observer.observe(video);
         });
     }
-
 }
-
