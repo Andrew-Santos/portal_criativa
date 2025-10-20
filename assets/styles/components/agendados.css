@@ -1,0 +1,510 @@
+/* agendados.css - Estilos para posts agendados */
+
+/* ===== LISTA DE AGENDADOS ===== */
+.agendados-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 20px;
+}
+
+.agendado-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-white);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+    touch-action: manipulation;
+}
+
+.agendado-item:active {
+    transform: scale(0.98);
+    box-shadow: var(--shadow-md);
+}
+
+/* ===== THUMBNAIL ===== */
+.agendado-thumbnail {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    min-width: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-light);
+}
+
+.thumbnail-media {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.thumbnail-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-light);
+    font-size: 32px;
+}
+
+.thumbnail-badge {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 32px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+}
+
+.thumbnail-count {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    backdrop-filter: blur(4px);
+}
+
+/* ===== INFO DO ITEM ===== */
+.agendado-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.agendado-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.agendado-client {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.client-mini-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.client-mini-avatar-placeholder {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.client-mini-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.post-type-badge {
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-light);
+    padding: 4px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.agendado-date {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.agendado-caption {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.agendado-arrow {
+    color: var(--text-light);
+    font-size: 20px;
+}
+
+/* ===== PREVIEW FULLSCREEN ===== */
+.post-preview {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(10px);
+}
+
+.preview-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.preview-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+}
+
+.preview-close:active {
+    transform: scale(0.9);
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.preview-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ===== PREVIEW MEDIA ===== */
+.preview-media-container {
+    width: 100%;
+    background: #212529;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.preview-media-container img{
+    border-radius: 15px 15px 0 0;
+}
+
+.preview-single-media,
+.preview-carousel-media {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.preview-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-light);
+    font-size: 64px;
+}
+
+/* ===== PREVIEW CAROUSEL ===== */
+.preview-carousel-track {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.preview-carousel-item {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+
+.preview-carousel-item.active {
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+.preview-carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(4px);
+    touch-action: manipulation;
+}
+
+.preview-carousel-btn:active {
+    transform: translateY(-50%) scale(0.9);
+}
+
+.preview-carousel-prev {
+    left: 16px;
+}
+
+.preview-carousel-next {
+    right: 16px;
+}
+
+.preview-carousel-btn i {
+    font-size: 28px;
+}
+
+.preview-carousel-indicators {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 10px 16px;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+}
+
+.preview-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+}
+
+.preview-indicator.active {
+    background: white;
+    width: 28px;
+    border-radius: 4px;
+}
+
+/* ===== PREVIEW INFO ===== */
+.preview-info {
+    background: var(--bg-white);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.preview-client {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.preview-client-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.preview-client-avatar-placeholder {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--bg-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 20px;
+}
+
+.preview-client-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.preview-client-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.preview-post-type {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.preview-caption {
+    padding: 16px;
+    background: var(--bg-light);
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.preview-caption p {
+    margin: 0;
+}
+
+.preview-date {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.preview-date i {
+    font-size: 18px;
+}
+
+/* ===== RESPONSIVE - TABLET ===== */
+@media (min-width: 768px) {
+    .agendados-list {
+        gap: 16px;
+    }
+
+    .agendado-item {
+        padding: 16px;
+    }
+
+    .agendado-thumbnail {
+        width: 100px;
+        height: 100px;
+        min-width: 100px;
+    }
+
+    .preview-close {
+        top: 24px;
+        right: 24px;
+    }
+
+    .preview-info {
+        padding: 32px;
+    }
+
+    .preview-carousel-btn {
+        opacity: 0;
+    }
+
+    .preview-carousel-container:hover .preview-carousel-btn {
+        opacity: 1;
+    }
+}
+
+/* ===== RESPONSIVE - DESKTOP ===== */
+@media (min-width: 1024px) {
+    .agendados-list {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .preview-media-container {
+        max-height: 80vh;
+    }
+}
+
+/* ===== SAFE AREAS (iOS) ===== */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .preview-info {
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+}
+
+/* ===== HIDE CAROUSEL BUTTONS ON MOBILE ===== */
+@media (max-width: 500px) {
+    .preview-carousel-btn {
+        display: none !important;
+    }
+}
