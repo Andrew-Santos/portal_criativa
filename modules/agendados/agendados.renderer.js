@@ -87,7 +87,7 @@ export class AgendadosRenderer {
                 </div>
 
                 <div class="agendado-arrow">
-                    <i class="ph-bold ph-caret-right"></i>
+                    <i class="ph ph-caret-right"></i>
                 </div>
             </div>
         `;
@@ -105,7 +105,7 @@ export class AgendadosRenderer {
                 
                 <div class="preview-container">
                     <button class="preview-close">
-                        <i class="ph-bold ph-x"></i>
+                        <i class="ph ph-x"></i>
                     </button>
 
                     <div class="preview-content">
@@ -222,10 +222,10 @@ export class AgendadosRenderer {
 
                 ${medias.length > 1 ? `
                     <button class="preview-carousel-btn preview-carousel-prev">
-                        <i class="ph-bold ph-caret-left"></i>
+                        <i class="ph ph-caret-left"></i>
                     </button>
                     <button class="preview-carousel-btn preview-carousel-next">
-                        <i class="ph-bold ph-caret-right"></i>
+                        <i class="ph ph-caret-right"></i>
                     </button>
 
                     <div class="preview-carousel-indicators">

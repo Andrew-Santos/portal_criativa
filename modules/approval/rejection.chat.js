@@ -30,7 +30,7 @@ export class RejectionChat {
                 <div class="chat-header">
                     <div class="chat-header-content">
                         <button class="chat-back-btn">
-                            <i class="ph-bold ph-arrow-left"></i>
+                            <i class="ph ph-arrow-left"></i>
                         </button>
                         <div class="chat-header-info">
                             <h3>Motivo da Recusa</h3>
@@ -66,7 +66,7 @@ export class RejectionChat {
                     <div class="chat-recording-ui" id="chat-recording-ui" style="display: none;">
                         <div class="recording-content">
                             <button class="recording-cancel-btn" id="recording-cancel-btn">
-                                <i class="ph-bold ph-x"></i>
+                                <i class="ph ph-x"></i>
                             </button>
                             <div class="audio-visualizer-container" id="audio-visualizer">
                                 ${Array.from({ length: 20 }, () => '<div class="audio-bar"></div>').join('')}

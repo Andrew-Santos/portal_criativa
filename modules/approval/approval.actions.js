@@ -3,6 +3,7 @@
 // Approval Actions - Gerencia ações e lógica do painel
 import { ApprovalRenderer } from './approval.renderer.js';
 import { AgendadosActions } from '../agendados/agendados.actions.js';
+import { CalendarioActions } from '../calendario/calendario.actions.js';
 import { RejectionChat } from './rejection.chat.js';
 
 export class ApprovalActions {
@@ -11,6 +12,7 @@ export class ApprovalActions {
         this.authData = authData;
         this.renderer = new ApprovalRenderer(this);
         this.agendadosActions = null;
+        this.calendarioActions = null;
         this.posts = [];
         this.currentTab = 'aprovacao';
         this.clientIds = authData.clients.map(c => c.id);
@@ -180,16 +182,13 @@ export class ApprovalActions {
     }
 
     loadCalendarioTab() {
-        const content = document.getElementById('tab-content');
-        if (!content) return;
-
-        content.innerHTML = `
-            <div class="empty-tab">
-                <i class="ph ph-calendar-blank"></i>
-                <h3>Calendário</h3>
-                <p>Funcionalidade em desenvolvimento</p>
-            </div>
-        `;
+        console.log('[ApprovalActions] Carregando aba de calendário...');
+        
+        if (!this.calendarioActions) {
+            this.calendarioActions = new CalendarioActions(this.panel, this.authData);
+        }
+        
+        this.calendarioActions.init();
     }
 
     loadAgendadosTab() {
@@ -335,25 +334,7 @@ export class ApprovalActions {
     /**
      * Modificado: Gerencia toggle de mudo (clique longo ou botão específico)
      */
-    handleVideoToggleMute(video) {
-        const indicator = video.parentElement.querySelector('.video-sound-indicator');
-        
-        if (video.muted) {
-            video.muted = false;
-            if (indicator) {
-                indicator.classList.remove('muted');
-                indicator.innerHTML = '<i class="ph-fill ph-speaker-high"></i>';
-            }
-            console.log('[ApprovalActions] Vídeo com som');
-        } else {
-            video.muted = true;
-            if (indicator) {
-                indicator.classList.add('muted');
-                indicator.innerHTML = '<i class="ph-fill ph-speaker-slash"></i>';
-            }
-            console.log('[ApprovalActions] Vídeo mutado');
-        }
-    }
+    
 
     async handleApprove(button) {
         const postId = button.dataset.postId;

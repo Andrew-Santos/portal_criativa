@@ -1,35 +1,48 @@
-/* Approval Panel - Mobile First Design */
+/* =====================================================
+   APPROVAL PANEL - MOBILE FIRST DESIGN
+   ===================================================== */
 
-/* ===== VARIÁVEIS ===== */
+/* ===== 1. VARIÁVEIS E IMPORTS ===== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@400;500;600;700&display=swap');
+
 :root {
+    /* Cores principais */
     --primary: #212529;
     --primary-dark: #1a1d20;
     --secondary: #495057;
     --success: #28a745;
     --danger: #dc3545;
+    
+    /* Backgrounds */
     --bg-light: #f8f9fa;
     --bg-white: #ffffff;
+    
+    /* Textos */
     --text-primary: #212529;
     --text-secondary: #6c757d;
     --text-light: #adb5bd;
+    
+    /* Bordas e sombras */
     --border: #dee2e6;
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
     
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600;700&family=Montserrat:wght@500;600;700&family=Nunito:wght@400;600;700&family=Poppins:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&family=Source+Sans+Pro:wght@400;600;700&display=swap');
-    --font-primary: 'Inter', 'Poppins', Arial, sans-serif;
+    /* Paleta de tons */
     --pt100: #212529;
-    --pt0: #f8f9fa;
-    --pt25: #e9ecef;
-    --pt50: #adb5bd;
     --pt75: #495057;
-
-
+    --pt50: #adb5bd;
+    --pt25: #e9ecef;
+    --pt0: #f8f9fa;
+    
+    /* Fontes */
+    --font-primary: 'Inter', 'Poppins', Arial, sans-serif;
 }
 
-/* ===== RESET & BASE ===== */
-* {
+/* ===== 2. RESET & BASE ===== */
+*,
+*::before,
+*::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -45,7 +58,7 @@ body {
     overflow-x: hidden;
 }
 
-/* ===== LOADING INICIAL ===== */
+/* ===== 3. LOADING INICIAL ===== */
 .initial-loading {
     position: fixed;
     top: 0;
@@ -71,23 +84,18 @@ body {
     animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
 .initial-loading p {
     color: var(--text-secondary);
     font-size: 14px;
 }
 
-/* ===== TELA DE LOGIN ===== */
+/* ===== 4. TELA DE LOGIN ===== */
 .auth-screen {
     min-height: 100vh;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     padding: 20px;
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
 }
@@ -162,6 +170,19 @@ body {
     color: var(--text-secondary);
 }
 
+.auth-error {
+    margin-top: 16px;
+    padding: 12px;
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+    font-size: 14px;
+    text-align: center;
+    animation: slideDown 0.3s ease;
+}
+
+/* ===== 5. BOTÕES ===== */
 .btn-primary {
     width: 100%;
     padding: 14px 24px;
@@ -202,29 +223,7 @@ body {
     animation: spin 0.6s linear infinite;
 }
 
-.auth-error {
-    margin-top: 16px;
-    padding: 12px;
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-    border-radius: 6px;
-    font-size: 14px;
-    text-align: center;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* ===== PAINEL PRINCIPAL ===== */
+/* ===== 6. PAINEL PRINCIPAL ===== */
 .approval-panel {
     min-height: 100vh;
     display: flex;
@@ -232,9 +231,9 @@ body {
     background-color: var(--pt25);
 }
 
-/* ===== HEADER ===== */
+/* ===== 7. HEADER ===== */
 .panel-header {
-    background: var(--pt100) !important;
+    background: var(--pt100);
     color: white;
     padding: 16px 20px;
     box-shadow: var(--shadow-md);
@@ -243,10 +242,11 @@ body {
     align-items: center;
     justify-content: space-between;
 }
-.panel-header img{
-    width: 100px;
-    filter: brightness(0) invert(1);}
 
+.panel-header img {
+    width: 100px;
+    filter: brightness(0) invert(1);
+}
 
 .header-content h1 {
     font-size: 22px;
@@ -264,7 +264,7 @@ body {
     color: #cecece;
 }
 
-/* ===== TABS NAVIGATION ===== */
+/* ===== 8. TABS NAVIGATION ===== */
 .tabs-nav {
     display: flex;
     background: var(--bg-white);
@@ -333,45 +333,42 @@ body {
     background: rgba(220, 53, 69, 0.1);
 }
 
-/* ===== CONTENT AREA ===== */
+/* ===== 9. CONTENT AREA ===== */
 .tab-content {
     flex: 1;
     padding: 16px;
     overflow-y: auto;
 }
 
-/* ===== POSTS LIST ===== */
+/* ===== 10. MASONRY GRID - POSTS LIST ===== */
 .posts-list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
     gap: 16px;
     padding-bottom: 20px;
 }
 
-/* ===== POST CARD ===== */
+/* Mobile: 1 coluna natural */
+.posts-list.masonry-initialized {
+    position: relative;
+}
+
+.posts-list.masonry-initialized .post-card {
+    position: absolute;
+    transition: top 0.3s ease, left 0.3s ease;
+}
+
+/* ===== 11. POST CARD ===== */
 .post-card {
     background: rgb(247, 247, 255);
     border-radius: 12px;
     overflow: hidden;
     box-shadow: var(--shadow-sm);
     animation: fadeInUp 0.4s ease;
-    width: 90%;
-    margin: auto;
-
+    width: 100%;
 }
 
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* ===== POST HEADER ===== */
+/* ===== 12. POST HEADER ===== */
 .post-header {
     display: flex;
     justify-content: space-between;
@@ -426,7 +423,7 @@ body {
     color: var(--pt0);
     text-transform: uppercase;
     letter-spacing: 0.3px;
-    background: rgba(0, 0, 0, 0.178);   
+    background: rgba(0, 0, 0, 0.178);
     padding: 2px 6px;
     border-radius: 4px;
     backdrop-filter: blur(6px);
@@ -441,7 +438,7 @@ body {
     white-space: nowrap;
 }
 
-/* ===== MEDIA PREVIEW ===== */
+/* ===== 13. MEDIA PREVIEW ===== */
 .media-preview {
     position: relative;
     width: 100%;
@@ -479,22 +476,40 @@ body {
     font-size: 14px;
 }
 
-.media-badge {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    color: white;
-    font-size: 12px;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 6px;
-    backdrop-filter: blur(4px);
-    z-index: 10;
+.media-video {
+    cursor: pointer;
 }
 
+/* ===== 14. VIDEO CONTROLS ===== */
+.video-play-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    z-index: 2;
+    pointer-events: all;
+}
 
+.video-play-overlay:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
 
+.video-play-overlay i {
+    font-size: 30px;
+    color: rgb(240, 240, 240);
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+    transition: transform 0.2s ease;
+}
+
+.video-play-overlay:hover i {
+    transform: scale(1.1);
+}
 
 .video-sound-indicator {
     position: absolute;
@@ -519,11 +534,7 @@ body {
     color: #dc3545;
 }
 
-.media-video {
-    cursor: pointer;
-}
-
-/* ===== CAROUSEL ===== */
+/* ===== 15. CAROUSEL ===== */
 .carousel-container {
     position: relative;
     touch-action: pan-y pinch-zoom;
@@ -616,7 +627,7 @@ body {
     border-radius: 4px;
 }
 
-
+/* ===== 16. POST CAPTION ===== */
 .post-caption {
     padding: 16px;
     font-size: 14px;
@@ -639,7 +650,7 @@ body {
     left: 0;
     right: 0;
     height: 40px;
-    background: linear-gradient(to bottom, transparent,  #f7f7ff);
+    background: linear-gradient(to bottom, transparent, #f7f7ff);
 }
 
 .post-caption-empty {
@@ -673,7 +684,7 @@ body {
     background: var(--bg-light);
 }
 
-/* ===== POST ACTIONS ===== */
+/* ===== 17. POST ACTIONS ===== */
 .post-actions {
     display: grid;
     grid-template-columns: 1fr;
@@ -682,7 +693,7 @@ body {
 }
 
 .btn-action {
-    padding: 7px ;
+    padding: 7px;
     border: 1px solid;
     border-radius: 3px;
     font-size: 10px;
@@ -696,9 +707,10 @@ body {
     gap: 10px;
     color: #000;
     background: #f0f0f0;
-    &:hover {
-        background: rgba(220, 53, 53, 0.1);
-    }
+}
+
+.btn-action:hover {
+    background: rgba(220, 53, 53, 0.1);
 }
 
 .btn-action i {
@@ -709,38 +721,40 @@ body {
     background: white;
     color: var(--danger);
     border: 1px solid var(--danger);
-    &:hover {
-        background: var(--danger);
-        color: white;
-    }
+}
+
+.btn-reject:hover {
+    background: var(--danger);
+    color: white;
 }
 
 .btn-reject:active {
     background: var(--danger);
     color: white;
     transform: scale(0.96);
-    
 }
 
 .btn-approve {
     background: var(--primary-dark);
     color: white;
-    &:hover {
-        background: #000;
-    }
+}
+
+.btn-approve:hover {
+    background: #000;
 }
 
 .btn-approve:active {
     background: #218838;
     transform: scale(0.96);
 }
-.btn-download, .btn-compartilhar{
-    background-color: white !important;
-    border: 1px solid var(--border) !important;
-    
+
+.btn-download,
+.btn-compartilhar {
+    background-color: white;
+    border: 1px solid var(--border);
 }
 
-/* ===== ESTADOS VAZIOS ===== */
+/* ===== 18. ESTADOS VAZIOS E LOADING ===== */
 .empty-state,
 .empty-tab,
 .error-container,
@@ -806,109 +820,7 @@ body {
     color: var(--text-secondary);
 }
 
-/* ===== RESPONSIVE - TABLET ===== */
-@media (min-width: 768px) {
-    .auth-form {
-        padding: 40px 30px;
-    }
-
-    .panel-header {
-        padding: 20px 32px;
-    }
-
-    .header-content h1 {
-        font-size: 26px;
-    }
-
-    .tab-content {
-        padding: 24px 32px;
-    }
-
-    .tabs-nav {
-        top: 76px;
-    }
-
-    .tab-item {
-        flex-direction: row;
-        padding: 16px 24px;
-        font-size: 14px;
-    }
-
-    .posts-list {
-        gap: 20px;
-    }
-
-    .post-card {
-        border-radius: 16px;
-    }
-
-    .carousel-btn {
-        opacity: 0;
-    }
-
-    .carousel-container:hover .carousel-btn {
-        opacity: 1;
-    }
-}
-
-/* ===== RESPONSIVE - DESKTOP ===== */
-@media (min-width: 1024px) {
-    .tab-content {
-        max-width: 600px;
-        margin: 0 auto;
-    }
-
-    .posts-list {
-        gap: 24px;
-    }
-}
-
-/* ===== SAFE AREAS (iOS) ===== */
-@supports (padding: env(safe-area-inset-bottom)) {
-    .panel-header {
-        padding-top: calc(16px + env(safe-area-inset-top));
-    }
-
-    .tab-content {
-        padding-bottom: calc(20px + env(safe-area-inset-bottom));
-    }
-}
-
-
-@media (max-width: 500px) {
-    .carousel-btn {
-        display: none !important;
-    }
-    
-
-}
-
-/* ===== ANIMAÇÃO FADE OUT ===== */
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-}
-
-
-/* ===== ANIMAÇÃO FADE OUT ===== */
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-}
-
-/* ===== MODAL DE LINKS DE MÍDIA ===== */
+/* ===== 19. MODAL DE LINKS ===== */
 .media-links-modal {
     position: fixed;
     top: 0;
@@ -920,15 +832,6 @@ body {
     align-items: center;
     justify-content: center;
     animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
 }
 
 .modal-overlay {
@@ -953,17 +856,6 @@ body {
     overflow-y: auto;
     box-shadow: var(--shadow-lg);
     animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 .modal-content h3 {
@@ -1035,52 +927,228 @@ body {
     background: var(--primary-dark);
 }
 
-
-/* Overlay de Play para Vídeos */
-.video-play-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.3);
-    cursor: pointer;
-    transition: background 0.3s ease;
-    z-index: 2;
-    pointer-events: all;
+/* ===== 20. ANIMAÇÕES ===== */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
-.video-play-overlay:hover {
-    background: rgba(0, 0, 0, 0.5);
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.video-play-overlay i {
-    font-size: 64px;
-    color: white;
-    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
-    transition: transform 0.2s ease;
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.video-play-overlay:hover i {
-    transform: scale(1.1);
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
 }
 
-/* Ajuste no cursor do vídeo */
-.media-video {
-    cursor: pointer;
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
-/* Esconder overlay quando vídeo está tocando */
-.media-video:not([paused]) ~ .video-play-overlay {
-    display: none;
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-/* Mobile - ajuste do tamanho do ícone */
-@media (max-width: 768px) {
+/* ===== 21. RESPONSIVE - TABLET (768px+) ===== */
+@media (min-width: 768px) {
+    /* Auth */
+    .auth-form {
+        padding: 40px 30px;
+    }
+
+    /* Header */
+    .panel-header {
+        padding: 20px 32px;
+    }
+
+    .header-content h1 {
+        font-size: 26px;
+    }
+
+    /* Tabs */
+    .tabs-nav {
+        box-shadow: var(--shadow-sm);
+    }
+
+    .tab-item {
+        flex-direction: row;
+        padding: 16px 24px;
+        font-size: 14px;
+    }
+
+    /* Content */
+    .tab-content {
+        padding: 24px 32px;
+    }
+
+    /* Posts - Masonry será controlado por JS */
+    .posts-list {
+        gap: 16px;
+    }
+
+    .post-card {
+        border-radius: 12px;
+        width: 100%;
+    }
+
+    /* Carousel */
+    .carousel-btn {
+        opacity: 0;
+    }
+
+    .carousel-container:hover .carousel-btn {
+        opacity: 1;
+    }
+
+    /* Video overlay */
     .video-play-overlay i {
         font-size: 48px;
     }
+}
+
+/* ===== 22. RESPONSIVE - DESKTOP (1024px+) ===== */
+@media (min-width: 1024px) {
+    /* Layout */
+    .approval-panel {
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+    }
+
+    /* Header */
+    .panel-header {
+        padding: 24px 48px;
+    }
+
+    .header-content {
+        max-width: 1600px;
+        margin: 0 auto;
+        width: 100%;
+    }
+
+    /* Tabs */
+    .tabs-nav {
+        justify-content: center;
+        gap: 8px;
+        padding: 0 48px;
+    }
+
+    .tab-item {
+        flex: 0 1 auto;
+        min-width: 140px;
+        padding: 14px 28px;
+        font-size: 15px;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .tab-item:hover {
+        background: rgba(33, 37, 41, 0.05);
+    }
+
+    .tab-item.active::after {
+        height: 4px;
+    }
+
+    /* Content */
+    .tab-content {
+        padding: 32px 48px;
+        max-width: 1600px;
+        margin: 0 auto;
+        width: 100%;
+    }
+
+    /* Posts - Masonry será controlado por JS */
+    .posts-list {
+        gap: 18px;
+    }
+
+    .post-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .post-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-md);
+    }
+
+    /* Actions */
+    .post-actions {
+        gap: 8px;
+    }
+
+    .btn-action {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+}
+
+/* ===== 23. RESPONSIVE - LARGE DESKTOP (1440px+) ===== */
+@media (min-width: 1440px) {
+    /* Posts - Masonry será controlado por JS - 5 colunas */
+    .posts-list {
+        gap: 18px;
+    }
+}
+
+/* ===== 24. MOBILE ESPECÍFICO (max-width: 500px) ===== */
+@media (max-width: 500px) {
+    .carousel-btn {
+        display: none;
+    }
+}
+
+/* ===== 25. SAFE AREAS (iOS) ===== */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .panel-header {
+        padding-top: calc(16px + env(safe-area-inset-top));
+    }
+
+    .tab-content {
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+}
+
+/* ===== 26. UTILITÁRIOS ===== */
+.hidden {
+    display: none !important;
+}
+
+.fade-out {
+    animation: fadeOut 0.3s ease forwards;
+}
+
+.no-scroll {
+    overflow: hidden;
 }

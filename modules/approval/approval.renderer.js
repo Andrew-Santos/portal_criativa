@@ -1,8 +1,9 @@
-// Approval Renderer - Renderização da interface
+// Approval Renderer - Renderização da interface com Masonry Layout
 export class ApprovalRenderer {
     constructor(actions) {
         this.actions = actions;
         this.container = actions.panel.container;
+        this.resizeTimeout = null;
     }
 
     renderBase() {
@@ -70,10 +71,24 @@ export class ApprovalRenderer {
         }
 
         content.innerHTML = `
-            <div class="posts-list">
+            <div class="posts-list" style="opacity: 0; transition: opacity 0.3s ease;">
                 ${posts.map(post => this.createPostCard(post)).join('')}
             </div>
         `;
+
+        // Inicializar Masonry após renderizar
+        const container = content.querySelector('.posts-list');
+        
+        setTimeout(() => {
+            this.initMasonry();
+            
+            // Mostrar container após Masonry aplicado
+            setTimeout(() => {
+                if (container) {
+                    container.style.opacity = '1';
+                }
+            }, 150);
+        }, 50);
     }
 
     createPostCard(post) {
@@ -89,13 +104,10 @@ export class ApprovalRenderer {
         
         return `
             <article class="post-card" data-post-id="${post.id}">
-                
-
                 ${hasMultipleMedia || isCarousel ? 
                     this.createCarouselPreview(medias, post.id, aspectRatio, post.type) : 
                     this.createSinglePreview(medias[0], aspectRatio, post.type)
                 }
-
 
                 <!-- Header do post -->
                 <div class="post-header">
@@ -109,14 +121,12 @@ export class ApprovalRenderer {
                         `}
                         <div class="client-info">
                             <span class="client-name">@${post.client?.users || 'Desconhecido'}</span>
-                            
                             <div class="post-date">
-                        <i class="ph ph-calendar"></i>
-                        ${scheduledDate}
-                    </div>
+                                <i class="ph ph-calendar"></i>
+                                ${scheduledDate}
+                            </div>
                         </div>
                     </div>
-                    
                 </div>
 
                 <!-- Legenda -->
@@ -139,7 +149,6 @@ export class ApprovalRenderer {
 
                 <!-- Ações -->
                 <div class="post-actions">
-
                     <button class="btn-action btn-compartilhar" data-post-id="${post.id}">
                         <i class="ph ph-export"></i>
                         Compartilhar
@@ -159,7 +168,6 @@ export class ApprovalRenderer {
                         <i class="ph ph-check-circle"></i>
                         Aprovar
                     </button>
-                    
                 </div>
             </article>
         `;
@@ -194,11 +202,7 @@ export class ApprovalRenderer {
                     </video>
                     
                     <div class="video-play-overlay">
-                        <i class="ph-fill ph-play-circle"></i>
-                    </div>
-                    
-                    <div class="video-sound-indicator muted">
-                        <i class="ph-fill ph-speaker-slash"></i>
+                        <i class="ph-fill ph-play"></i>
                     </div>
                 ` : `
                     <img 
@@ -252,10 +256,10 @@ export class ApprovalRenderer {
                 
                 ${sortedMedias.length > 1 ? `
                     <button class="carousel-btn carousel-prev" data-carousel="${postId}">
-                        <i class="ph-bold ph-caret-left"></i>
+                        <i class="ph ph-caret-left"></i>
                     </button>
                     <button class="carousel-btn carousel-next" data-carousel="${postId}">
-                        <i class="ph-bold ph-caret-right"></i>
+                        <i class="ph ph-caret-right"></i>
                     </button>
                     
                     <div class="carousel-indicators">
@@ -334,5 +338,145 @@ export class ApprovalRenderer {
         // Considera longa se tiver mais de 150 caracteres ou mais de 3 linhas
         const lines = text.split('\n').length;
         return text.length > 150 || lines > 3;
+    }
+
+    // ===== MASONRY LAYOUT =====
+    initMasonry() {
+        const container = document.querySelector('.posts-list');
+        if (!container) return;
+
+        const cards = Array.from(container.querySelectorAll('.post-card'));
+        if (cards.length === 0) return;
+
+        console.log('[ApprovalRenderer] Inicializando Masonry com', cards.length, 'cards');
+
+        // Determinar número de colunas baseado na largura da tela
+        const getColumnCount = () => {
+            const width = window.innerWidth;
+            if (width >= 1440) return 5;
+            if (width >= 1024) return 4;
+            if (width >= 768) return 2;
+            return 1;
+        };
+
+        const layoutMasonry = () => {
+            const columnCount = getColumnCount();
+            
+            console.log('[ApprovalRenderer] Aplicando layout com', columnCount, 'colunas');
+
+            if (columnCount === 1) {
+                // Mobile: layout normal
+                container.classList.remove('masonry-initialized');
+                cards.forEach(card => {
+                    card.style.position = '';
+                    card.style.top = '';
+                    card.style.left = '';
+                    card.style.width = '';
+                });
+                container.style.height = '';
+                return;
+            }
+
+            container.classList.add('masonry-initialized');
+
+            const containerWidth = container.offsetWidth;
+            const gap = window.innerWidth >= 1024 ? 18 : 16;
+            const columnWidth = (containerWidth - (gap * (columnCount - 1))) / columnCount;
+
+            // Array para armazenar a altura atual de cada coluna
+            const columnHeights = new Array(columnCount).fill(0);
+
+            cards.forEach((card, index) => {
+                // Forçar recalculo de altura
+                card.style.width = `${columnWidth}px`;
+                
+                // Aguardar um frame para garantir que a largura foi aplicada
+                requestAnimationFrame(() => {
+                    // Encontrar a coluna mais curta
+                    const shortestColumn = columnHeights.indexOf(Math.min(...columnHeights));
+
+                    // Calcular posição
+                    const left = shortestColumn * (columnWidth + gap);
+                    const top = columnHeights[shortestColumn];
+
+                    // Aplicar posição
+                    card.style.position = 'absolute';
+                    card.style.left = `${left}px`;
+                    card.style.top = `${top}px`;
+
+                    // Atualizar altura da coluna com a altura real do card
+                    const cardHeight = card.offsetHeight;
+                    columnHeights[shortestColumn] += cardHeight + gap;
+
+                    // Se for o último card, definir altura do container
+                    if (index === cards.length - 1) {
+                        requestAnimationFrame(() => {
+                            const maxHeight = Math.max(...columnHeights);
+                            container.style.height = `${maxHeight}px`;
+                            console.log('[ApprovalRenderer] Layout Masonry aplicado. Altura:', maxHeight);
+                        });
+                    }
+                });
+            });
+        };
+
+        // Função para aguardar carregamento de TODAS as imagens e vídeos
+        const waitForMediaLoad = () => {
+            return new Promise((resolve) => {
+                const medias = container.querySelectorAll('img, video');
+                
+                if (medias.length === 0) {
+                    resolve();
+                    return;
+                }
+
+                let loadedCount = 0;
+                const totalMedia = medias.length;
+
+                const checkComplete = () => {
+                    loadedCount++;
+                    console.log(`[ApprovalRenderer] Mídia carregada: ${loadedCount}/${totalMedia}`);
+                    
+                    if (loadedCount === totalMedia) {
+                        console.log('[ApprovalRenderer] Todas as mídias carregadas!');
+                        resolve();
+                    }
+                };
+
+                medias.forEach((media) => {
+                    if (media.tagName === 'IMG') {
+                        if (media.complete && media.naturalHeight !== 0) {
+                            checkComplete();
+                        } else {
+                            media.addEventListener('load', checkComplete, { once: true });
+                            media.addEventListener('error', checkComplete, { once: true });
+                        }
+                    } else if (media.tagName === 'VIDEO') {
+                        if (media.readyState >= 2) {
+                            checkComplete();
+                        } else {
+                            media.addEventListener('loadeddata', checkComplete, { once: true });
+                            media.addEventListener('error', checkComplete, { once: true });
+                        }
+                    }
+                });
+            });
+        };
+
+        // Aguardar carregamento e então aplicar layout
+        waitForMediaLoad().then(() => {
+            // Aguardar mais um frame para garantir renderização completa
+            requestAnimationFrame(() => {
+                setTimeout(layoutMasonry, 100);
+            });
+        });
+
+        // Recriar layout ao redimensionar janela
+        window.removeEventListener('resize', this.handleResize);
+        this.handleResize = () => {
+            clearTimeout(this.resizeTimeout);
+            this.resizeTimeout = setTimeout(layoutMasonry, 200);
+        };
+        window.addEventListener('resize', this.handleResize);
     }
 }
