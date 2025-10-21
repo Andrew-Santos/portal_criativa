@@ -1,6 +1,4 @@
-// approval.actions.js
-
-// Approval Actions - Gerencia ações e lógica do painel
+// approval.actions.js - Gerencia ações e lógica do painel
 import { ApprovalRenderer } from './approval.renderer.js';
 import { AgendadosActions } from '../agendados/agendados.actions.js';
 import { CalendarioActions } from '../calendario/calendario.actions.js';
@@ -16,6 +14,7 @@ export class ApprovalActions {
         this.posts = [];
         this.currentTab = 'aprovacao';
         this.clientIds = authData.clients.map(c => c.id);
+        this.carouselStates = new Map();
     }
 
     async init() {
@@ -76,7 +75,6 @@ export class ApprovalActions {
                 this.handleExpandCaption(expandBtn);
             }
 
-            // Novo: Clique no vídeo ou no overlay de play
             const videoOverlay = e.target.closest('.video-play-overlay');
             const video = e.target.closest('.media-video');
             
@@ -89,7 +87,6 @@ export class ApprovalActions {
             }
         });
 
-        // Listener para evento de post rejeitado via chat
         document.addEventListener('post-rejected', (e) => {
             this.handlePostRejectedFromChat(e.detail.postId);
         });
@@ -135,8 +132,12 @@ export class ApprovalActions {
             this.posts = await this.fetchPendingPosts();
             console.log('[ApprovalActions] Posts pendentes encontrados:', this.posts.length);
             this.renderer.renderPosts(this.posts);
-            setTimeout(() => this.attachCarouselSwipeEvents(), 100);
-            this.attachVideoObservers();
+            
+            // Aguardar um pouco antes de anexar eventos (CSS Masonry já está aplicado)
+            setTimeout(() => {
+                this.attachCarouselSwipeEvents();
+                this.attachVideoObservers();
+            }, 100);
         } catch (error) {
             console.error('[ApprovalActions] Erro ao carregar posts:', error);
             content.innerHTML = `
@@ -214,8 +215,8 @@ export class ApprovalActions {
 
         const track = container.querySelector('.carousel-track');
         const items = Array.from(track.querySelectorAll('.carousel-item'));
-        const indicators = Array.from(container.querySelectorAll('.indicator'));
-        const currentIndex = items.findIndex(item => item.classList.contains('active'));
+        
+        let currentIndex = this.carouselStates.get(carouselId) || 0;
         
         let newIndex;
         if (button.classList.contains('carousel-prev')) {
@@ -224,117 +225,147 @@ export class ApprovalActions {
             newIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
         }
 
-        items.forEach(item => item.classList.remove('active'));
-        indicators.forEach(ind => ind.classList.remove('active'));
-        items[newIndex].classList.add('active');
-        indicators[newIndex].classList.add('active');
+        this.navigateToSlide(container, newIndex, items.length);
+    }
 
-        items.forEach((item, index) => {
-            const video = item.querySelector('video');
-            if (video) {
-                video.pause();
-                video.currentTime = 0;
-                // Esconder overlay de play
-                const overlay = video.parentElement.querySelector('.video-play-overlay');
-                if (overlay) overlay.style.display = 'flex';
-            }
+    navigateToSlide(container, newIndex, totalItems) {
+        const carouselId = container.dataset.carouselId;
+        const track = container.querySelector('.carousel-track');
+        const indicators = Array.from(container.querySelectorAll('.indicator'));
+        
+        this.carouselStates.set(carouselId, newIndex);
+        container.dataset.currentIndex = newIndex;
+        
+        const translateX = -(newIndex * 100);
+        track.style.transform = `translateX(${translateX}%)`;
+        
+        indicators.forEach((ind, i) => {
+            ind.classList.toggle('active', i === newIndex);
         });
+
+        const videos = track.querySelectorAll('video');
+        videos.forEach(video => {
+            video.pause();
+            video.currentTime = 0;
+            const overlay = video.parentElement?.querySelector('.video-play-overlay');
+            if (overlay) overlay.style.display = 'flex';
+        });
+
+        console.log(`[ApprovalActions] Navegado para slide ${newIndex + 1} de ${totalItems}`);
     }
 
     attachCarouselSwipeEvents() {
-        document.querySelectorAll('.carousel-container').forEach(container => {
-            const clone = container.cloneNode(true);
-            container.parentNode.replaceChild(clone, container);
-        });
-
         setTimeout(() => {
             document.querySelectorAll('.carousel-container').forEach(container => {
+                const carouselId = container.dataset.carouselId;
+                
+                // Ler o índice atual do DOM ou inicializar com 0
+                const currentIndexFromDOM = parseInt(container.dataset.currentIndex) || 0;
+                
+                if (!this.carouselStates.has(carouselId)) {
+                    this.carouselStates.set(carouselId, currentIndexFromDOM);
+                    console.log(`[ApprovalActions] Estado inicial do carousel ${carouselId}: ${currentIndexFromDOM}`);
+                }
+
                 let touchStartX = 0;
                 let touchEndX = 0;
+                let isDragging = false;
 
-                container.addEventListener('touchstart', (e) => {
+                // Remover listeners antigos se existirem
+                const oldStartHandler = container._touchStartHandler;
+                const oldMoveHandler = container._touchMoveHandler;
+                const oldEndHandler = container._touchEndHandler;
+                
+                if (oldStartHandler) container.removeEventListener('touchstart', oldStartHandler);
+                if (oldMoveHandler) container.removeEventListener('touchmove', oldMoveHandler);
+                if (oldEndHandler) container.removeEventListener('touchend', oldEndHandler);
+
+                // Criar novos handlers
+                const touchStartHandler = (e) => {
                     touchStartX = e.changedTouches[0].screenX;
-                }, { passive: true });
+                    touchEndX = touchStartX;
+                    isDragging = true;
+                };
 
-                container.addEventListener('touchend', (e) => {
+                const touchMoveHandler = (e) => {
+                    if (!isDragging) return;
                     touchEndX = e.changedTouches[0].screenX;
-                    this.handleCarouselSwipe(container, touchStartX, touchEndX);
-                }, { passive: true });
+                };
+
+                const touchEndHandler = (e) => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    
+                    const threshold = 50;
+                    const diff = touchStartX - touchEndX;
+
+                    console.log(`[ApprovalActions] Swipe detectado: diff=${diff}, threshold=${threshold}`);
+
+                    if (Math.abs(diff) < threshold) {
+                        console.log('[ApprovalActions] Swipe muito pequeno, ignorando');
+                        return;
+                    }
+
+                    // Pegar o índice atual do estado sincronizado
+                    const currentIndex = this.carouselStates.get(carouselId) || 0;
+                    const items = container.querySelectorAll('.carousel-item');
+                    const totalItems = items.length;
+                    
+                    console.log(`[ApprovalActions] Índice atual antes do swipe: ${currentIndex} de ${totalItems}`);
+                    
+                    let newIndex;
+
+                    if (diff > 0) {
+                        // Swipe para ESQUERDA = PRÓXIMO
+                        newIndex = (currentIndex + 1) % totalItems;
+                        console.log(`[ApprovalActions] Swipe esquerda: ${currentIndex} → ${newIndex}`);
+                    } else {
+                        // Swipe para DIREITA = ANTERIOR
+                        newIndex = currentIndex > 0 ? currentIndex - 1 : totalItems - 1;
+                        console.log(`[ApprovalActions] Swipe direita: ${currentIndex} → ${newIndex}`);
+                    }
+
+                    this.navigateToSlide(container, newIndex, totalItems);
+                };
+
+                // Adicionar novos listeners
+                container.addEventListener('touchstart', touchStartHandler, { passive: true });
+                container.addEventListener('touchmove', touchMoveHandler, { passive: true });
+                container.addEventListener('touchend', touchEndHandler, { passive: true });
+
+                // Guardar referências para remoção futura
+                container._touchStartHandler = touchStartHandler;
+                container._touchMoveHandler = touchMoveHandler;
+                container._touchEndHandler = touchEndHandler;
             });
         }, 100);
     }
 
-    handleCarouselSwipe(container, startX, endX) {
-        const threshold = 50;
-        const diff = startX - endX;
-
-        if (Math.abs(diff) < threshold) return;
-
-        const track = container.querySelector('.carousel-track');
-        const items = Array.from(track.querySelectorAll('.carousel-item'));
-        const indicators = Array.from(container.querySelectorAll('.indicator'));
-        const currentIndex = items.findIndex(item => item.classList.contains('active'));
-
-        let newIndex;
-        if (diff > 0) {
-            newIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-        } else {
-            newIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-        }
-
-        items.forEach(item => item.classList.remove('active'));
-        indicators.forEach(ind => ind.classList.remove('active'));
-        items[newIndex].classList.add('active');
-        indicators[newIndex].classList.add('active');
-
-        items.forEach((item, index) => {
-            const video = item.querySelector('video');
-            if (video) {
-                video.pause();
-                video.currentTime = 0;
-                // Esconder overlay de play
-                const overlay = video.parentElement.querySelector('.video-play-overlay');
-                if (overlay) overlay.style.display = 'flex';
-            }
-        });
-    }
-
-    /**
-     * Novo método: Gerencia clique no vídeo para play/pause
-     */
     handleVideoClick(video) {
         if (!video) return;
 
         const overlay = video.parentElement.querySelector('.video-play-overlay');
         
         if (video.paused) {
-            // Pausar todos os outros vídeos
             document.querySelectorAll('.media-video').forEach(v => {
                 if (v !== video && !v.paused) {
                     v.pause();
-                    v.currentTime = 0; // Voltar ao primeiro frame
+                    v.currentTime = 0;
                     const otherOverlay = v.parentElement.querySelector('.video-play-overlay');
                     if (otherOverlay) otherOverlay.style.display = 'flex';
                 }
             });
 
-            // Play no vídeo clicado
             video.play();
             if (overlay) overlay.style.display = 'none';
             console.log('[ApprovalActions] Vídeo iniciado');
         } else {
-            // Pause e voltar ao primeiro frame
             video.pause();
-            video.currentTime = 0; // Voltar ao primeiro frame
+            video.currentTime = 0;
             if (overlay) overlay.style.display = 'flex';
             console.log('[ApprovalActions] Vídeo pausado e resetado');
         }
     }
-
-    /**
-     * Modificado: Gerencia toggle de mudo (clique longo ou botão específico)
-     */
-    
 
     async handleApprove(button) {
         const postId = button.dataset.postId;
@@ -384,7 +415,6 @@ export class ApprovalActions {
         
         console.log('[ApprovalActions] handleReject chamado para post:', postId);
         console.log('[ApprovalActions] Post encontrado:', post);
-        console.log('[ApprovalActions] RejectionChat disponível?', typeof RejectionChat);
         
         if (!post) {
             alert('Post não encontrado.');
@@ -392,7 +422,6 @@ export class ApprovalActions {
         }
 
         try {
-            // Abrir modal de chat
             const chat = new RejectionChat(postId, post);
             console.log('[ApprovalActions] Instância do chat criada:', chat);
             chat.open();
@@ -405,14 +434,12 @@ export class ApprovalActions {
     handlePostRejectedFromChat(postId) {
         console.log('[ApprovalActions] Post rejeitado via chat:', postId);
         
-        // Remover card da lista
         const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
         if (card) {
             card.style.animation = 'fadeOut 0.3s ease';
             setTimeout(() => {
                 card.remove();
                 
-                // Verificar se ficou vazio
                 const remaining = document.querySelectorAll('.post-card').length;
                 if (remaining === 0) {
                     this.renderer.renderPosts([]);
@@ -451,8 +478,7 @@ export class ApprovalActions {
                     window.open(media.url_media, '_blank');
                     alert('Download bloqueado por CORS. A mídia foi aberta em nova aba. Use "Salvar como..." para baixar.');
                 }
-            } 
-            else {
+            } else {
                 try {
                     await this.downloadMultipleMediasAsZip(medias, postId);
                 } catch (corsError) {
@@ -640,10 +666,9 @@ export class ApprovalActions {
                 const video = entry.target;
                 const overlay = video.parentElement.querySelector('.video-play-overlay');
                 
-                // Se o vídeo sair do viewport, pausar, resetar e mostrar overlay
                 if (!entry.isIntersecting && !video.paused) {
                     video.pause();
-                    video.currentTime = 0; // Voltar ao primeiro frame
+                    video.currentTime = 0;
                     if (overlay) overlay.style.display = 'flex';
                     console.log('[ApprovalActions] Vídeo saiu do viewport - pausado e resetado');
                 }
