@@ -26,7 +26,7 @@ const ALLOWED_TYPES = {
     'video/x-msvideo': '.avi'
 };
 
-const MAX_FILE_SIZE = 150 * 1024 * 1024; // 100MB
+const MAX_FILE_SIZE = 290 * 1024 * 1024; // 100MB
 
 const readBody = (req) => {
     return new Promise((resolve, reject) => {
@@ -361,3 +361,4 @@ module.exports = async (req, res) => {
     });
 
 };
+
