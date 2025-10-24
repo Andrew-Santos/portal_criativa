@@ -1,5 +1,5 @@
-// api/cloudflare.js - Com Presigned URLs
-const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+// api/cloudflare.js - API Completa com Presigned URLs + Listagem
+const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 // Configuração do Cloudflare R2
@@ -21,12 +21,14 @@ const ALLOWED_TYPES = {
     'image/jpg': '.jpg',
     'image/png': '.png',
     'image/gif': '.gif',
+    'image/webp': '.webp',
     'video/mp4': '.mp4',
     'video/quicktime': '.mov',
-    'video/x-msvideo': '.avi'
+    'video/x-msvideo': '.avi',
+    'video/webm': '.webm'
 };
 
-const MAX_FILE_SIZE = 290 * 1024 * 1024; // 100MB
+const MAX_FILE_SIZE = 290 * 1024 * 1024; // 290MB
 
 const readBody = (req) => {
     return new Promise((resolve, reject) => {
@@ -43,6 +45,33 @@ const readBody = (req) => {
         });
         req.on('error', reject);
     });
+};
+
+// Função auxiliar para detectar tipo de arquivo
+const detectFileType = (key) => {
+    const ext = key.toLowerCase().split('.').pop();
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+    const videoExts = ['mp4', 'mov', 'avi', 'webm', 'mkv'];
+    
+    if (imageExts.includes(ext)) return 'image';
+    if (videoExts.includes(ext)) return 'video';
+    return 'other';
+};
+
+// Função auxiliar para detectar pasta
+const detectFolder = (key) => {
+    const parts = key.split('/');
+    if (parts.length > 1) {
+        return parts[0];
+    }
+    
+    // Tenta detectar pela nomenclatura
+    if (key.includes('post_')) return 'posts';
+    if (key.includes('banner_')) return 'banners';
+    if (key.includes('logo_')) return 'logos';
+    if (key.includes('profile_')) return 'perfil';
+    
+    return 'geral';
 };
 
 module.exports = async (req, res) => {
@@ -74,7 +103,89 @@ module.exports = async (req, res) => {
     }
 
     // ============================================
-    // NOVO: Gerar Presigned URL para upload único
+    // NOVO: Listar TODOS os arquivos do R2
+    // ============================================
+    if (req.method === 'GET' && req.url.includes('/list-all')) {
+        try {
+            console.log('Listando todos os arquivos do R2...');
+            
+            let allObjects = [];
+            let continuationToken = undefined;
+            let totalSize = 0;
+
+            // Paginação do R2 (lista até 1000 por vez)
+            do {
+                const command = new ListObjectsV2Command({
+                    Bucket: BUCKET_NAME,
+                    ContinuationToken: continuationToken,
+                    MaxKeys: 1000
+                });
+
+                const response = await R2.send(command);
+                
+                if (response.Contents) {
+                    allObjects = allObjects.concat(response.Contents);
+                    console.log(`Carregados ${response.Contents.length} arquivos...`);
+                }
+
+                continuationToken = response.NextContinuationToken;
+            } while (continuationToken);
+
+            console.log(`Total de arquivos encontrados: ${allObjects.length}`);
+
+            // Processar e formatar arquivos
+            const files = allObjects.map(obj => {
+                const fileName = obj.Key.split('/').pop();
+                const type = detectFileType(obj.Key);
+                const folder = detectFolder(obj.Key);
+                const size = obj.Size || 0;
+                
+                totalSize += size;
+
+                return {
+                    key: obj.Key,
+                    fileName: fileName,
+                    url: `${R2_PUBLIC_URL}/${obj.Key}`,
+                    type: type,
+                    folder: folder,
+                    size: size,
+                    lastModified: obj.LastModified,
+                    etag: obj.ETag
+                };
+            });
+
+            // Estatísticas
+            const stats = {
+                total: files.length,
+                images: files.filter(f => f.type === 'image').length,
+                videos: files.filter(f => f.type === 'video').length,
+                others: files.filter(f => f.type === 'other').length
+            };
+
+            console.log('Estatísticas:', stats);
+            console.log(`Tamanho total: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+
+            res.status(200).json({
+                success: true,
+                files: files,
+                totalSize: totalSize,
+                stats: stats,
+                timestamp: new Date().toISOString()
+            });
+
+        } catch (error) {
+            console.error('Erro ao listar arquivos:', error);
+            res.status(500).json({ 
+                success: false,
+                error: 'Erro ao listar arquivos',
+                details: error.message
+            });
+        }
+        return;
+    }
+
+    // ============================================
+    // Gerar Presigned URL para upload único
     // ============================================
     if (req.method === 'POST' && req.url.includes('/generate-upload-url')) {
         try {
@@ -141,7 +252,7 @@ module.exports = async (req, res) => {
     }
 
     // ============================================
-    // NOVO: Gerar Presigned URLs para múltiplos uploads
+    // Gerar Presigned URLs para múltiplos uploads
     // ============================================
     if (req.method === 'POST' && req.url.includes('/generate-upload-urls')) {
         try {
@@ -220,7 +331,7 @@ module.exports = async (req, res) => {
     }
 
     // ============================================
-    // NOVO: Verificar se arquivo existe no R2
+    // Verificar se arquivo existe no R2
     // ============================================
     if (req.method === 'POST' && req.url.includes('/verify-upload')) {
         try {
@@ -351,6 +462,7 @@ module.exports = async (req, res) => {
         method: req.method, 
         url: req.url,
         availableRoutes: [
+            'GET /list-all',
             'POST /generate-upload-url',
             'POST /generate-upload-urls',
             'POST /verify-upload',
@@ -359,6 +471,4 @@ module.exports = async (req, res) => {
             'GET /health'
         ]
     });
-
 };
-
