@@ -168,6 +168,7 @@ export class ApprovalRenderer {
         }
 
         const isVideo = media.type === 'video';
+        const posterUrl = isVideo ? (media.url_capa || `${media.url_media}#t=0.001`) : '';
         
         return `
             <div class="media-preview" style="aspect-ratio: ${aspectRatio};">
@@ -178,7 +179,7 @@ export class ApprovalRenderer {
                         playsinline
                         loop
                         preload="metadata"
-                        poster="">
+                        poster="${posterUrl}">
                         Seu navegador não suporta vídeo.
                     </video>
                     
