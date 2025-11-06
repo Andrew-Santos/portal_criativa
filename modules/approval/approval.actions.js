@@ -165,7 +165,8 @@ export class ApprovalActions {
                         id,
                         type,
                         url_media,
-                        order
+                        order,
+                        url_capa
                     )
                 `)
                 .in('id_client', this.clientIds)
@@ -259,7 +260,6 @@ export class ApprovalActions {
             document.querySelectorAll('.carousel-container').forEach(container => {
                 const carouselId = container.dataset.carouselId;
                 
-                // Ler o índice atual do DOM ou inicializar com 0
                 const currentIndexFromDOM = parseInt(container.dataset.currentIndex) || 0;
                 
                 if (!this.carouselStates.has(carouselId)) {
@@ -271,7 +271,6 @@ export class ApprovalActions {
                 let touchEndX = 0;
                 let isDragging = false;
 
-                // Remover listeners antigos se existirem
                 const oldStartHandler = container._touchStartHandler;
                 const oldMoveHandler = container._touchMoveHandler;
                 const oldEndHandler = container._touchEndHandler;
@@ -280,7 +279,6 @@ export class ApprovalActions {
                 if (oldMoveHandler) container.removeEventListener('touchmove', oldMoveHandler);
                 if (oldEndHandler) container.removeEventListener('touchend', oldEndHandler);
 
-                // Criar novos handlers
                 const touchStartHandler = (e) => {
                     touchStartX = e.changedTouches[0].screenX;
                     touchEndX = touchStartX;
@@ -306,7 +304,6 @@ export class ApprovalActions {
                         return;
                     }
 
-                    // Pegar o índice atual do estado sincronizado
                     const currentIndex = this.carouselStates.get(carouselId) || 0;
                     const items = container.querySelectorAll('.carousel-item');
                     const totalItems = items.length;
@@ -316,11 +313,9 @@ export class ApprovalActions {
                     let newIndex;
 
                     if (diff > 0) {
-                        // Swipe para ESQUERDA = PRÓXIMO
                         newIndex = (currentIndex + 1) % totalItems;
                         console.log(`[ApprovalActions] Swipe esquerda: ${currentIndex} → ${newIndex}`);
                     } else {
-                        // Swipe para DIREITA = ANTERIOR
                         newIndex = currentIndex > 0 ? currentIndex - 1 : totalItems - 1;
                         console.log(`[ApprovalActions] Swipe direita: ${currentIndex} → ${newIndex}`);
                     }
@@ -328,12 +323,10 @@ export class ApprovalActions {
                     this.navigateToSlide(container, newIndex, totalItems);
                 };
 
-                // Adicionar novos listeners
                 container.addEventListener('touchstart', touchStartHandler, { passive: true });
                 container.addEventListener('touchmove', touchMoveHandler, { passive: true });
                 container.addEventListener('touchend', touchEndHandler, { passive: true });
 
-                // Guardar referências para remoção futura
                 container._touchStartHandler = touchStartHandler;
                 container._touchMoveHandler = touchMoveHandler;
                 container._touchEndHandler = touchEndHandler;

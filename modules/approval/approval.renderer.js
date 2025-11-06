@@ -168,18 +168,26 @@ export class ApprovalRenderer {
         }
 
         const isVideo = media.type === 'video';
-        const posterUrl = isVideo ? (media.url_capa || `${media.url_media}#t=0.001`) : '';
+        
+        // Usar url_capa se disponível, senão usar #t=0.001 para primeiro frame
+        const posterAttr = media.url_capa 
+            ? `poster="${media.url_capa}"` 
+            : '';
+        
+        const videoSrc = media.url_capa 
+            ? media.url_media 
+            : `${media.url_media}#t=0.001`;
         
         return `
             <div class="media-preview" style="aspect-ratio: ${aspectRatio};">
                 ${isVideo ? `
                     <video 
-                        src="${media.url_media}#t=0.001" 
+                        src="${videoSrc}" 
                         class="media-video" 
                         playsinline
                         loop
                         preload="metadata"
-                        poster="${posterUrl}">
+                        ${posterAttr}>
                         Seu navegador não suporta vídeo.
                     </video>
                     
@@ -212,16 +220,25 @@ export class ApprovalRenderer {
                     ${sortedMedias.map((media, index) => {
                         const isVideo = media.type === 'video';
                         
+                        // Usar url_capa se disponível, senão usar #t=0.001 para primeiro frame
+                        const posterAttr = media.url_capa 
+                            ? `poster="${media.url_capa}"` 
+                            : '';
+                        
+                        const videoSrc = media.url_capa 
+                            ? media.url_media 
+                            : `${media.url_media}#t=0.001`;
+                        
                         return `
                             <div class="carousel-item ${index === 0 ? 'active' : ''}" data-index="${index}">
                                 ${isVideo ? `
                                     <video 
-                                        src="${media.url_media}#t=0.001" 
+                                        src="${videoSrc}" 
                                         class="media-video" 
                                         controls
                                         playsinline
                                         preload="metadata"
-                                        poster="">
+                                        ${posterAttr}>
                                         Seu navegador não suporta vídeo.
                                     </video>
                                 ` : `
