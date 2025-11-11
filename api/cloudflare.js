@@ -1,4 +1,4 @@
-// api/cloudflare.js - API Completa com Presigned URLs + Listagem
+// api/cloudflare.js - API Completa com Presigned URLs + Listagem + URLs Encodificadas
 const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -29,6 +29,18 @@ const ALLOWED_TYPES = {
 };
 
 const MAX_FILE_SIZE = 290 * 1024 * 1024; // 290MB
+
+// ✅ NOVO: Função para criar URL pública corretamente encodificada
+const createPublicUrl = (key) => {
+    // Dividir em partes pelo /
+    const parts = key.split('/');
+    // Encodificar cada parte separadamente
+    const encodedParts = parts.map(part => encodeURIComponent(part));
+    // Juntar novamente
+    const encodedPath = encodedParts.join('/');
+    // Retornar URL completa
+    return `${R2_PUBLIC_URL}/${encodedPath}`;
+};
 
 const readBody = (req) => {
     return new Promise((resolve, reject) => {
@@ -79,7 +91,7 @@ module.exports = async (req, res) => {
     console.log('Método:', req.method);
     console.log('URL:', req.url);
 
-    // CORS
+    // ✅ CORS CONFIGURADO CORRETAMENTE
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -96,14 +108,14 @@ module.exports = async (req, res) => {
         console.log('Health check OK');
         res.status(200).json({ 
             status: 'ok', 
-            service: 'Cloudflare R2 API with Presigned URLs', 
+            service: 'Cloudflare R2 API with Presigned URLs (Fixed)', 
             timestamp: new Date().toISOString() 
         });
         return;
     }
 
     // ============================================
-    // NOVO: Listar TODOS os arquivos do R2
+    // Listar TODOS os arquivos do R2
     // ============================================
     if (req.method === 'GET' && req.url.includes('/list-all')) {
         try {
@@ -133,7 +145,7 @@ module.exports = async (req, res) => {
 
             console.log(`Total de arquivos encontrados: ${allObjects.length}`);
 
-            // Processar e formatar arquivos
+            // ✅ Processar e formatar arquivos COM URLS CORRETAS
             const files = allObjects.map(obj => {
                 const fileName = obj.Key.split('/').pop();
                 const type = detectFileType(obj.Key);
@@ -145,7 +157,7 @@ module.exports = async (req, res) => {
                 return {
                     key: obj.Key,
                     fileName: fileName,
-                    url: `${R2_PUBLIC_URL}/${obj.Key}`,
+                    url: createPublicUrl(obj.Key), // ✅ URL ENCODIFICADA CORRETAMENTE
                     type: type,
                     folder: folder,
                     size: size,
@@ -223,7 +235,11 @@ module.exports = async (req, res) => {
             const command = new PutObjectCommand({
                 Bucket: BUCKET_NAME,
                 Key: fileName,
-                ContentType: contentType
+                ContentType: contentType,
+                // ✅ ADICIONAR METADATA CORS
+                Metadata: {
+                    'access-control-allow-origin': '*'
+                }
             });
 
             // Gerar URL assinada (válida por 15 minutos)
@@ -236,7 +252,7 @@ module.exports = async (req, res) => {
             res.status(200).json({
                 success: true,
                 uploadUrl: uploadUrl,
-                publicUrl: `${R2_PUBLIC_URL}/${fileName}`,
+                publicUrl: createPublicUrl(fileName), // ✅ URL ENCODIFICADA
                 fileName: fileName,
                 expiresIn: 900
             });
@@ -297,7 +313,11 @@ module.exports = async (req, res) => {
                 const command = new PutObjectCommand({
                     Bucket: BUCKET_NAME,
                     Key: fileName,
-                    ContentType: contentType
+                    ContentType: contentType,
+                    // ✅ ADICIONAR METADATA CORS
+                    Metadata: {
+                        'access-control-allow-origin': '*'
+                    }
                 });
 
                 // Gerar URL assinada
@@ -308,7 +328,7 @@ module.exports = async (req, res) => {
                 uploadUrls.push({
                     fileName: fileName,
                     uploadUrl: uploadUrl,
-                    publicUrl: `${R2_PUBLIC_URL}/${fileName}`
+                    publicUrl: createPublicUrl(fileName) // ✅ URL ENCODIFICADA
                 });
             }
 
