@@ -28,7 +28,7 @@ const ALLOWED_TYPES = {
     'video/webm': '.webm'
 };
 
-const MAX_FILE_SIZE = 290 * 1024 * 1024; // 290MB
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 290MB
 
 // ✅ NOVO: Função para criar URL pública corretamente encodificada
 const createPublicUrl = (key) => {
@@ -492,3 +492,4 @@ module.exports = async (req, res) => {
         ]
     });
 };
+
