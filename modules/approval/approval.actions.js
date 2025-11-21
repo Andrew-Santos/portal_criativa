@@ -173,6 +173,7 @@ export class ApprovalActions {
                 .neq('status', 'APROVADO')
                 .neq('status', 'REPROVADO')
                 .neq('status', 'PUBLICADO')
+                .neq('status', 'AGENDADO')
                 .order('agendamento', { ascending: true });
 
             if (error) throw error;
@@ -672,4 +673,5 @@ export class ApprovalActions {
             observer.observe(video);
         });
     }
+
 }
