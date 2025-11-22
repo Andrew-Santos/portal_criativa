@@ -66,7 +66,7 @@ export class AgendadosActions {
                     )
                 `)
                 .in('id_client', this.clientIds)
-                .eq('status', 'APROVADO')
+                .in('status', ['APROVADO', 'AGENDADO'])
                 .order('agendamento', { ascending: false });
 
             if (error) throw error;
@@ -289,4 +289,5 @@ export class AgendadosActions {
             content.innerHTML = '';
         }
     }
+
 }
