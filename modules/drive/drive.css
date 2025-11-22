@@ -1,0 +1,335 @@
+/* drive.css - Galeria estilo iPhone */
+
+/* ===== GALERIA CONTAINER ===== */
+.drive-gallery {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding-bottom: 20px;
+}
+
+/* ===== STATS ===== */
+.drive-stats {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 4px;
+}
+
+.drive-stats span {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* ===== SCROLL INFINITO ===== */
+.drive-scroll-sentinel {
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.drive-loading-more {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.loading-spinner-small {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top: 2px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.drive-end-message {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-light);
+    font-size: 12px;
+}
+
+/* ===== GRUPO POR DATA ===== */
+.drive-date-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.drive-date-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+}
+
+.drive-date-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: capitalize;
+}
+
+.drive-date-count {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--bg-light);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+/* ===== GRID DE THUMBNAILS ===== */
+.drive-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+}
+
+/* ===== THUMBNAIL ===== */
+.drive-thumbnail {
+    position: relative;
+    aspect-ratio: 1;
+    cursor: pointer;
+    overflow: hidden;
+    background: var(--bg-light);
+}
+
+.drive-thumbnail-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.drive-thumbnail-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.2s ease;
+}
+
+.drive-thumbnail:active .drive-thumbnail-img {
+    transform: scale(0.95);
+}
+
+/* ===== BADGE DE VÍDEO ===== */
+.drive-video-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
+}
+
+.drive-video-badge i {
+    font-size: 8px;
+}
+
+/* ===== PREVIEW FULLSCREEN ===== */
+.drive-preview {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.drive-preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(10px);
+}
+
+.drive-preview-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ===== PREVIEW HEADER ===== */
+.drive-preview-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    z-index: 10;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+}
+
+.drive-preview-close,
+.drive-download-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    font-size: 22px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+}
+
+.drive-preview-close:active,
+.drive-download-btn:active {
+    transform: scale(0.9);
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* ===== PREVIEW MEDIA ===== */
+.drive-preview-media {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 0;
+    position: relative;
+}
+
+.drive-preview-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+}
+
+.drive-preview-loading .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: white;
+}
+
+.drive-preview-image,
+.drive-preview-video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: opacity 0.3s ease;
+}
+
+.drive-preview-video {
+    background: #000;
+}
+
+/* ===== PREVIEW INFO ===== */
+.drive-preview-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px;
+    background: linear-gradient(to top, rgba(0,0,0,0.5), transparent);
+    color: white;
+    text-align: center;
+}
+
+.drive-preview-name {
+    font-size: 14px;
+    font-weight: 500;
+    max-width: 80%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.drive-preview-dimensions {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+/* ===== RESPONSIVE - TABLET ===== */
+@media (min-width: 768px) {
+    .drive-grid {
+        grid-template-columns: repeat(6, 1fr);
+        gap: 2px;
+    }
+
+    .drive-date-title {
+        font-size: 15px;
+    }
+
+    .drive-video-badge {
+        font-size: 10px;
+        padding: 3px 6px;
+    }
+
+    .drive-video-badge i {
+        font-size: 9px;
+    }
+
+    .drive-preview-header {
+        padding: 24px;
+    }
+
+    .drive-preview-close:hover,
+    .drive-download-btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: scale(1.05);
+    }
+}
+
+/* ===== RESPONSIVE - DESKTOP ===== */
+@media (min-width: 1024px) {
+    .drive-gallery {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .drive-grid {
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+    }
+
+    .drive-thumbnail:hover .drive-thumbnail-img {
+        transform: scale(1.02);
+    }
+}
+
+/* ===== SAFE AREAS (iOS) ===== */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .drive-preview-header {
+        padding-top: calc(16px + env(safe-area-inset-top));
+    }
+
+    .drive-preview-info {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+}

@@ -2,6 +2,7 @@
 import { ApprovalRenderer } from './approval.renderer.js';
 import { AgendadosActions } from '../agendados/agendados.actions.js';
 import { CalendarioActions } from '../calendario/calendario.actions.js';
+import { DriveActions } from '../drive/drive.actions.js';
 import { RejectionChat } from './rejection.chat.js';
 
 export class ApprovalActions {
@@ -11,6 +12,7 @@ export class ApprovalActions {
         this.renderer = new ApprovalRenderer(this);
         this.agendadosActions = null;
         this.calendarioActions = null;
+        this.driveActions = null;
         this.posts = [];
         this.currentTab = 'aprovacao';
         this.clientIds = authData.clients.map(c => c.id);
@@ -114,6 +116,9 @@ export class ApprovalActions {
             case 'aprovacao':
                 this.loadApprovalTab();
                 break;
+            case 'drive':
+                this.loadDriveTab();
+                break;
         }
     }
 
@@ -133,7 +138,6 @@ export class ApprovalActions {
             console.log('[ApprovalActions] Posts pendentes encontrados:', this.posts.length);
             this.renderer.renderPosts(this.posts);
             
-            // Aguardar um pouco antes de anexar eventos (CSS Masonry já está aplicado)
             setTimeout(() => {
                 this.attachCarouselSwipeEvents();
                 this.attachVideoObservers();
@@ -204,6 +208,16 @@ export class ApprovalActions {
         this.agendadosActions.init();
     }
 
+    loadDriveTab() {
+        console.log('[ApprovalActions] Carregando aba de drive...');
+        
+        if (!this.driveActions) {
+            this.driveActions = new DriveActions(this.panel, this.authData);
+        }
+        
+        this.driveActions.init();
+    }
+
     handleLogout() {
         if (confirm('Deseja realmente sair?')) {
             this.panel.logout();
@@ -260,12 +274,10 @@ export class ApprovalActions {
         setTimeout(() => {
             document.querySelectorAll('.carousel-container').forEach(container => {
                 const carouselId = container.dataset.carouselId;
-                
                 const currentIndexFromDOM = parseInt(container.dataset.currentIndex) || 0;
                 
                 if (!this.carouselStates.has(carouselId)) {
                     this.carouselStates.set(carouselId, currentIndexFromDOM);
-                    console.log(`[ApprovalActions] Estado inicial do carousel ${carouselId}: ${currentIndexFromDOM}`);
                 }
 
                 let touchStartX = 0;
@@ -298,27 +310,17 @@ export class ApprovalActions {
                     const threshold = 50;
                     const diff = touchStartX - touchEndX;
 
-                    console.log(`[ApprovalActions] Swipe detectado: diff=${diff}, threshold=${threshold}`);
-
-                    if (Math.abs(diff) < threshold) {
-                        console.log('[ApprovalActions] Swipe muito pequeno, ignorando');
-                        return;
-                    }
+                    if (Math.abs(diff) < threshold) return;
 
                     const currentIndex = this.carouselStates.get(carouselId) || 0;
                     const items = container.querySelectorAll('.carousel-item');
                     const totalItems = items.length;
                     
-                    console.log(`[ApprovalActions] Índice atual antes do swipe: ${currentIndex} de ${totalItems}`);
-                    
                     let newIndex;
-
                     if (diff > 0) {
                         newIndex = (currentIndex + 1) % totalItems;
-                        console.log(`[ApprovalActions] Swipe esquerda: ${currentIndex} → ${newIndex}`);
                     } else {
                         newIndex = currentIndex > 0 ? currentIndex - 1 : totalItems - 1;
-                        console.log(`[ApprovalActions] Swipe direita: ${currentIndex} → ${newIndex}`);
                     }
 
                     this.navigateToSlide(container, newIndex, totalItems);
@@ -337,7 +339,6 @@ export class ApprovalActions {
 
     handleVideoClick(video) {
         if (!video) return;
-
         const overlay = video.parentElement.querySelector('.video-play-overlay');
         
         if (video.paused) {
@@ -349,21 +350,17 @@ export class ApprovalActions {
                     if (otherOverlay) otherOverlay.style.display = 'flex';
                 }
             });
-
             video.play();
             if (overlay) overlay.style.display = 'none';
-            console.log('[ApprovalActions] Vídeo iniciado');
         } else {
             video.pause();
             video.currentTime = 0;
             if (overlay) overlay.style.display = 'flex';
-            console.log('[ApprovalActions] Vídeo pausado e resetado');
         }
     }
 
     async handleApprove(button) {
         const postId = button.dataset.postId;
-        
         if (!confirm('Deseja aprovar este post?')) return;
         
         button.disabled = true;
@@ -372,29 +369,21 @@ export class ApprovalActions {
         
         try {
             const now = new Date().toISOString();
-            
             const { error } = await window.supabaseClient
                 .from('post')
-                .update({
-                    status: 'APROVADO',
-                    approval_date: now
-                })
+                .update({ status: 'APROVADO', approval_date: now })
                 .eq('id', postId);
             
             if (error) throw error;
-            
-            console.log('[ApprovalActions] Post aprovado:', postId);
             
             const card = button.closest('.post-card');
             card.style.animation = 'fadeOut 0.3s ease';
             setTimeout(() => {
                 card.remove();
-                const remaining = document.querySelectorAll('.post-card').length;
-                if (remaining === 0) {
+                if (document.querySelectorAll('.post-card').length === 0) {
                     this.renderer.renderPosts([]);
                 }
             }, 300);
-            
         } catch (error) {
             console.error('[ApprovalActions] Erro ao aprovar:', error);
             alert('Erro ao aprovar post. Tente novamente.');
@@ -406,36 +395,24 @@ export class ApprovalActions {
     async handleReject(button) {
         const postId = button.dataset.postId;
         const post = this.posts.find(p => p.id == postId);
-        
-        console.log('[ApprovalActions] handleReject chamado para post:', postId);
-        console.log('[ApprovalActions] Post encontrado:', post);
-        
-        if (!post) {
-            alert('Post não encontrado.');
-            return;
-        }
+        if (!post) { alert('Post não encontrado.'); return; }
 
         try {
             const chat = new RejectionChat(postId, post);
-            console.log('[ApprovalActions] Instância do chat criada:', chat);
             chat.open();
         } catch (error) {
             console.error('[ApprovalActions] Erro ao abrir chat:', error);
-            alert('Erro ao abrir chat de rejeição. Verifique o console: ' + error.message);
+            alert('Erro ao abrir chat: ' + error.message);
         }
     }
 
     handlePostRejectedFromChat(postId) {
-        console.log('[ApprovalActions] Post rejeitado via chat:', postId);
-        
         const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
         if (card) {
             card.style.animation = 'fadeOut 0.3s ease';
             setTimeout(() => {
                 card.remove();
-                
-                const remaining = document.querySelectorAll('.post-card').length;
-                if (remaining === 0) {
+                if (document.querySelectorAll('.post-card').length === 0) {
                     this.renderer.renderPosts([]);
                 }
             }, 300);
@@ -451,8 +428,6 @@ export class ApprovalActions {
             return;
         }
 
-        console.log('[ApprovalActions] Iniciando download para o post:', postId);
-
         button.disabled = true;
         const originalHTML = button.innerHTML;
         button.innerHTML = '<div class="btn-spinner"></div> Baixando...';
@@ -467,16 +442,14 @@ export class ApprovalActions {
                 
                 try {
                     await this.downloadMediaAsBlob(media.url_media, filename);
-                } catch (corsError) {
-                    console.warn('[ApprovalActions] CORS bloqueou fetch, abrindo em nova aba');
+                } catch {
                     window.open(media.url_media, '_blank');
-                    alert('Download bloqueado por CORS. A mídia foi aberta em nova aba. Use "Salvar como..." para baixar.');
+                    alert('Download bloqueado por CORS. A mídia foi aberta em nova aba.');
                 }
             } else {
                 try {
                     await this.downloadMultipleMediasAsZip(medias, postId);
-                } catch (corsError) {
-                    console.warn('[ApprovalActions] CORS bloqueou ZIP, mostrando links');
+                } catch {
                     this.showMediaLinksModal(medias, postId);
                 }
             }
@@ -490,64 +463,42 @@ export class ApprovalActions {
     }
 
     async downloadMediaAsBlob(url, filename) {
-        try {
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error(`Falha na rede ao buscar a mídia: ${response.statusText}`);
-            }
-            
-            const blob = await response.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = objectUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            URL.revokeObjectURL(objectUrl);
-        } catch (error) {
-            console.error(`[ApprovalActions] Erro no fetch de ${url}:`, error);
-            throw error;
-        }
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Falha na rede');
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
     }
 
     async downloadMultipleMediasAsZip(medias, postId) {
-        if (typeof JSZip === 'undefined') {
-            alert('Erro: A biblioteca JSZip não foi carregada.');
-            throw new Error("JSZip não está definido");
-        }
+        if (typeof JSZip === 'undefined') throw new Error("JSZip não está definido");
 
         const zip = new JSZip();
-        const zipFilename = `post_${postId}_midias.zip`;
-
         const promises = medias.map(async (media) => {
             const response = await fetch(media.url_media);
             if (!response.ok) return null;
-            return {
-                blob: await response.blob(),
-                type: media.type
-            };
+            return { blob: await response.blob(), type: media.type };
         });
 
         const results = await Promise.all(promises);
-
         results.forEach((result, index) => {
             if (result) {
                 const extension = result.type === 'video' ? 'mp4' : 'png';
-                const filename = `midia_${String(index + 1).padStart(2, '0')}.${extension}`;
-                zip.file(filename, result.blob);
+                zip.file(`midia_${String(index + 1).padStart(2, '0')}.${extension}`, result.blob);
             }
         });
 
         const zipBlob = await zip.generateAsync({ type: 'blob' });
-        
         const objectUrl = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
         a.href = objectUrl;
-        a.download = zipFilename;
+        a.download = `post_${postId}_midias.zip`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -563,33 +514,19 @@ export class ApprovalActions {
                 <h3>📥 Mídias para Download</h3>
                 <p>Toque em cada link para baixar:</p>
                 <div class="media-links-list">
-                    ${medias.map((media, i) => {
-                        const extension = media.type === 'video' ? 'Vídeo' : 'Imagem';
-                        return `
-                            <a href="${media.url_media}" 
-                               download="post_${postId}_media_${i + 1}" 
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               class="media-link-item">
-                                ${extension} ${i + 1}
-                                <i class="ph ph-download-simple"></i>
-                            </a>
-                        `;
-                    }).join('')}
+                    ${medias.map((media, i) => `
+                        <a href="${media.url_media}" download target="_blank" class="media-link-item">
+                            ${media.type === 'video' ? 'Vídeo' : 'Imagem'} ${i + 1}
+                            <i class="ph ph-download-simple"></i>
+                        </a>
+                    `).join('')}
                 </div>
                 <button class="btn-close-modal">Fechar</button>
             </div>
         `;
-
         document.body.appendChild(modal);
-
-        modal.querySelector('.btn-close-modal').addEventListener('click', () => {
-            modal.remove();
-        });
-
-        modal.querySelector('.modal-overlay').addEventListener('click', () => {
-            modal.remove();
-        });
+        modal.querySelector('.btn-close-modal').addEventListener('click', () => modal.remove());
+        modal.querySelector('.modal-overlay').addEventListener('click', () => modal.remove());
     }
 
     handleShare(button) {
@@ -601,44 +538,27 @@ export class ApprovalActions {
             return;
         }
 
-        console.log('[ApprovalActions] Preparando links para compartilhar do post:', postId);
-
         let shareText = 'Segue a mídia do portal Criativa\n\n';
-        
         const sortedMedias = post.post_media.sort((a, b) => (a.order || 0) - (b.order || 0));
-        
         sortedMedias.forEach((media, index) => {
             shareText += `Link ${index + 1}: ${media.url_media}\n`;
         });
         
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(shareText.trim())
-                .then(() => {
-                    alert('Links das mídias copiados para a área de transferência!');
-                })
-                .catch(err => {
-                    console.error('[ApprovalActions] Erro ao copiar links:', err);
-                    alert('Não foi possível copiar os links.');
-                });
+                .then(() => alert('Links das mídias copiados!'))
+                .catch(() => alert('Não foi possível copiar os links.'));
         } else {
-            alert('A função de copiar não é suportada em ambientes não seguros (HTTP). Por favor, use HTTPS ou Informe ao Administrador do sistema.');
-            console.warn('[ApprovalActions] navigator.clipboard não está disponível. Ambiente não seguro.');
+            alert('Função de copiar não suportada neste ambiente.');
         }
     }
 
     handleExpandCaption(button) {
         const postId = button.dataset.postId;
-        console.log('[ApprovalActions] Expandir legenda do post:', postId);
-        
         const caption = document.querySelector(`.post-caption[data-post-id="${postId}"]`);
-        
-        if (!caption) {
-            console.error('[ApprovalActions] Legenda não encontrada para post:', postId);
-            return;
-        }
+        if (!caption) return;
 
         const isCollapsed = caption.classList.contains('post-caption-collapsed');
-        
         if (isCollapsed) {
             caption.classList.remove('post-caption-collapsed');
             button.innerHTML = '<i class="ph ph-caret-up"></i> Ver menos';
@@ -649,29 +569,18 @@ export class ApprovalActions {
     }
 
     attachVideoObservers() {
-        const observerOptions = {
-            root: null,
-            rootMargin: '0px',
-            threshold: 0.5
-        };
-
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 const video = entry.target;
                 const overlay = video.parentElement.querySelector('.video-play-overlay');
-                
                 if (!entry.isIntersecting && !video.paused) {
                     video.pause();
                     video.currentTime = 0;
                     if (overlay) overlay.style.display = 'flex';
-                    console.log('[ApprovalActions] Vídeo saiu do viewport - pausado e resetado');
                 }
             });
-        }, observerOptions);
+        }, { threshold: 0.5 });
 
-        document.querySelectorAll('.media-video').forEach(video => {
-            observer.observe(video);
-        });
+        document.querySelectorAll('.media-video').forEach(video => observer.observe(video));
     }
-
 }

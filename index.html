@@ -8,7 +8,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-    
     <title>Painel de Aprovação - Portal Criativa</title>
     <link rel="shortcut icon" href="https://www.teamcriativa.com/IMAGES/icone.svg" type="image/x-icon">
 
@@ -16,45 +15,31 @@
     <link rel="stylesheet" href="./assets/styles/components/approval-panel.css">
     <link rel="stylesheet" href="./assets/styles/components/agendados.css">
     <link rel="stylesheet" href="./assets/styles/components/rejection-chat.css">
+    <link rel="stylesheet" href="./assets/styles/components/drive.css">
     <link rel="stylesheet" href="./modules/calendario/calendario.css">
+    <link rel="stylesheet" href="./modules/drive/drive.css">
 
-
-
-    <!-- Open Graph (Facebook, LinkedIn, etc.) -->
+    <!-- Open Graph -->
     <meta property="og:title" content="Portal de Aprovação - Team Criativa">
-    <meta property="og:description" content="Esse é o portal de aprovação de artes da Team Criativa. Aqui você pode revisar, aprovar ou solicitar ajustes nas artes criadas para suas campanhas e projetos.">
+    <meta property="og:description" content="Esse é o portal de aprovação de artes da Team Criativa.">
     <meta property="og:image" content="https://teamcriativa.com/IMAGES/logo.jpg">
     <meta property="og:url" content="https://portal.teamcriativa.com/">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Team Criativa">
 
-
-    <!-- Bibliotecas externas (CDN) -->
+    <!-- Bibliotecas externas -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <link
-      rel="stylesheet"
-      type="text/css"
-      href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css"
-    />
-    <link
-      rel="stylesheet"
-      type="text/css"
-      href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css"
-    />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
 </head>
 <body>
-    <!-- Container principal - será preenchido dinamicamente -->
     <div id="app-container"></div>
 
- 
-    <!-- Loading inicial -->
     <div id="initial-loading" class="initial-loading">
         <div class="loading-spinner"></div>
         <p>Carregando...</p>
     </div>
 
-    <!-- Entry point -->
     <script type="module" src="./approval-main.js"></script>
 </body>
 </html>
