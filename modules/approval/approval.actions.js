@@ -60,12 +60,11 @@ export class ApprovalActions {
 
             // Ações do modal
             if (e.target.closest('.post-modal')) {
-                // Ações estilo Instagram (ícones)
+                // Ações do modal
                 const actionBtn = e.target.closest('.action-btn[data-action]');
                 if (actionBtn) {
                     e.stopPropagation();
                     const action = actionBtn.dataset.action;
-                    const postId = actionBtn.dataset.postId;
                     
                     switch(action) {
                         case 'approve':
@@ -77,25 +76,7 @@ export class ApprovalActions {
                         case 'download':
                             this.handleDownload(actionBtn);
                             break;
-                        case 'share':
-                            this.handleShare(actionBtn);
-                            break;
                     }
-                    return;
-                }
-
-                // Botões principais (footer)
-                const approveBtn = e.target.closest('.btn-approve');
-                if (approveBtn) {
-                    e.stopPropagation();
-                    this.handleApprove(approveBtn);
-                    return;
-                }
-
-                const rejectBtn = e.target.closest('.btn-reject');
-                if (rejectBtn) {
-                    e.stopPropagation();
-                    this.handleReject(rejectBtn);
                     return;
                 }
 
@@ -107,11 +88,14 @@ export class ApprovalActions {
                     return;
                 }
 
-                // Play/pause de vídeo
+                // Click no vídeo ou overlay para play/pause
+                const videoElement = e.target.closest('.media-video');
                 const videoOverlay = e.target.closest('.video-play-overlay');
-                if (videoOverlay) {
+                
+                if (videoElement || videoOverlay) {
                     e.stopPropagation();
-                    this.handleVideoClick(videoOverlay);
+                    const video = videoElement || videoOverlay.previousElementSibling;
+                    this.toggleVideoPlayback(video);
                     return;
                 }
             }
@@ -130,26 +114,32 @@ export class ApprovalActions {
         });
     }
 
-    handleVideoClick(overlay) {
-        const video = overlay.previousElementSibling;
+    toggleVideoPlayback(video) {
         if (!video || video.tagName !== 'VIDEO') return;
-
+        
+        const overlay = video.nextElementSibling;
+        
         if (video.paused) {
-            // Pausar outros vídeos
+            // Pausar outros vídeos no modal
             document.querySelectorAll('.post-modal video').forEach(v => {
                 if (v !== video && !v.paused) {
                     v.pause();
-                    v.currentTime = 0;
                     const otherOverlay = v.nextElementSibling;
-                    if (otherOverlay) otherOverlay.style.display = 'flex';
+                    if (otherOverlay && otherOverlay.classList.contains('video-play-overlay')) {
+                        otherOverlay.classList.add('show');
+                    }
                 }
             });
             
             video.play();
-            overlay.style.display = 'none';
+            if (overlay && overlay.classList.contains('video-play-overlay')) {
+                overlay.classList.remove('show');
+            }
         } else {
             video.pause();
-            overlay.style.display = 'flex';
+            if (overlay && overlay.classList.contains('video-play-overlay')) {
+                overlay.classList.add('show');
+            }
         }
     }
 
@@ -348,9 +338,13 @@ export class ApprovalActions {
                 video.currentTime = 0;
             }
             
-            // Mostrar overlay apenas no slide ativo
+            // Mostrar overlay apenas no slide ativo se for vídeo
             if (overlay) {
-                overlay.style.display = i === newIndex ? 'flex' : 'none';
+                if (i === newIndex) {
+                    overlay.classList.add('show');
+                } else {
+                    overlay.classList.remove('show');
+                }
             }
         });
 
@@ -416,39 +410,56 @@ export class ApprovalActions {
         
         button.disabled = true;
         const originalHTML = button.innerHTML;
-        button.innerHTML = '<div class="btn-spinner"></div> Aprovando...';
         
-        try {
-            const now = new Date().toISOString();
-            const { error } = await window.supabaseClient
-                .from('post')
-                .update({ status: 'APROVADO', approval_date: now })
-                .eq('id', postId);
-            
-            if (error) throw error;
-            
-            this.closePostModal();
-            
-            // Remover da lista
-            this.posts = this.posts.filter(p => p.id != postId);
-            
-            // Remover thumbnail
-            const thumbnail = document.querySelector(`.post-item[data-post-id="${postId}"]`);
-            if (thumbnail) {
-                thumbnail.style.animation = 'fadeOut 0.3s ease';
-                setTimeout(() => {
-                    thumbnail.remove();
-                    if (document.querySelectorAll('.post-item').length === 0) {
-                        this.renderer.renderPosts([]);
-                    }
-                }, 300);
+        // Animação de like (coração preenchido)
+        button.innerHTML = '<i class="ph-fill ph-heart" style="color: #ed4956; animation: likeAnimation 0.4s ease;"></i>';
+        
+        // Adicionar animação CSS inline
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes likeAnimation {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.3); }
             }
-        } catch (error) {
-            console.error('[ApprovalActions] Erro ao aprovar:', error);
-            alert('Erro ao aprovar post. Tente novamente.');
-            button.disabled = false;
-            button.innerHTML = originalHTML;
-        }
+        `;
+        document.head.appendChild(style);
+        
+        setTimeout(async () => {
+            try {
+                const now = new Date().toISOString();
+                const { error } = await window.supabaseClient
+                    .from('post')
+                    .update({ status: 'APROVADO', approval_date: now })
+                    .eq('id', postId);
+                
+                if (error) throw error;
+                
+                this.closePostModal();
+                
+                // Remover da lista
+                this.posts = this.posts.filter(p => p.id != postId);
+                
+                // Remover thumbnail
+                const thumbnail = document.querySelector(`.post-item[data-post-id="${postId}"]`);
+                if (thumbnail) {
+                    thumbnail.style.animation = 'fadeOut 0.3s ease';
+                    setTimeout(() => {
+                        thumbnail.remove();
+                        if (document.querySelectorAll('.post-item').length === 0) {
+                            this.renderer.renderPosts([]);
+                        }
+                    }, 300);
+                }
+                
+                document.head.removeChild(style);
+            } catch (error) {
+                console.error('[ApprovalActions] Erro ao aprovar:', error);
+                alert('Erro ao aprovar post. Tente novamente.');
+                button.disabled = false;
+                button.innerHTML = originalHTML;
+                document.head.removeChild(style);
+            }
+        }, 400);
     }
 
     async handleReject(button) {
