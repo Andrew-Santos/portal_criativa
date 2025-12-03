@@ -171,16 +171,13 @@ export class ApprovalRenderer {
                         <!-- Actions estilo Instagram -->
                         <div class="post-modal-actions">
                             <button class="action-btn action-btn-approve" data-post-id="${post.id}" data-action="approve" title="Aprovar">
-                                <i class="ph-fill ph-heart"></i>
-                            </button>
-                            <button class="action-btn" data-post-id="${post.id}" data-action="share" title="Compartilhar">
-                                <i class="ph-fill ph-paper-plane-tilt"></i>
-                            </button>
-                            <button class="action-btn" data-post-id="${post.id}" data-action="download" title="Download">
-                                <i class="ph-fill ph-download-simple"></i>
+                                <i class="ph ph-heart"></i>
                             </button>
                             <button class="action-btn action-btn-reject" data-post-id="${post.id}" data-action="reject" title="Recusar">
-                                <i class="ph-fill ph-x-circle"></i>
+                                <i class="ph ph-x-circle"></i>
+                            </button>
+                            <button class="action-btn action-btn-download" data-post-id="${post.id}" data-action="download" title="Download">
+                                <i class="ph ph-download-simple"></i>
                             </button>
                         </div>
 
@@ -195,18 +192,6 @@ export class ApprovalRenderer {
                                     <i class="ph ph-text-align-left"></i> Sem legenda
                                 </div>
                             `}
-                        </div>
-
-                        <!-- Footer com botões principais -->
-                        <div class="post-modal-footer">
-                            <button class="btn-action btn-reject" data-post-id="${post.id}">
-                                <i class="ph ph-x-circle"></i>
-                                Recusar
-                            </button>
-                            <button class="btn-action btn-approve" data-post-id="${post.id}">
-                                <i class="ph ph-check-circle"></i>
-                                Aprovar
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -231,8 +216,8 @@ export class ApprovalRenderer {
         const videoSrc = media.url_capa ? media.url_media : `${media.url_media}#t=0.001`;
         
         return isVideo ? `
-            <video src="${videoSrc}" class="media-video" playsinline preload="metadata" ${posterAttr}></video>
-            <div class="video-play-overlay">
+            <video src="${videoSrc}" class="media-video" playsinline preload="auto" controls ${posterAttr}></video>
+            <div class="video-play-overlay show">
                 <i class="ph-fill ph-play-circle"></i>
             </div>
         ` : `
@@ -258,9 +243,9 @@ export class ApprovalRenderer {
                         return `
                             <div class="carousel-item ${index === 0 ? 'active' : ''}" data-index="${index}">
                                 ${isVideo ? `
-                                    <video src="${videoSrc}" class="media-video" playsinline preload="metadata" ${posterAttr}></video>
+                                    <video src="${videoSrc}" class="media-video" playsinline preload="auto" controls ${posterAttr}></video>
                                     ${index === 0 ? `
-                                        <div class="video-play-overlay">
+                                        <div class="video-play-overlay show">
                                             <i class="ph-fill ph-play-circle"></i>
                                         </div>
                                     ` : ''}
