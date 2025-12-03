@@ -76,6 +76,9 @@ export class ApprovalActions {
                         case 'download':
                             this.handleDownload(actionBtn);
                             break;
+                        case 'edit':
+                            this.handleEdit(actionBtn);
+                            break;
                     }
                     return;
                 }
@@ -621,3 +624,4 @@ export class ApprovalActions {
         }
     }
 }
+
