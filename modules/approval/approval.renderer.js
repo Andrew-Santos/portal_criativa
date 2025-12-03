@@ -124,82 +124,88 @@ export class ApprovalRenderer {
     }
 
     createPostModal(post) {
-        const medias = post.post_media || [];
-        const hasMultipleMedia = medias.length > 1;
+    const medias = post.post_media || [];
+    const hasMultipleMedia = medias.length > 1;
 
-        const modalHTML = `
-            <div class="post-modal" data-post-id="${post.id}">
-                <div class="post-modal-overlay"></div>
-                <div class="post-modal-content">
-                    <button class="post-modal-close">
-                        <i class="ph ph-x"></i>
-                    </button>
+    const modalHTML = `
+        <div class="post-modal" data-post-id="${post.id}">
+            <div class="post-modal-overlay"></div>
+            <div class="post-modal-content">
+                <button class="post-modal-close">
+                    <i class="ph ph-x"></i>
+                </button>
 
-                    <div class="post-modal-header">
-                        ${post.client?.profile_photo ? `
-                            <img src="${post.client.profile_photo}" alt="${post.client.users}" class="client-avatar">
-                        ` : `
-                            <div class="client-avatar-placeholder">
-                                <i class="ph-fill ph-user"></i>
-                            </div>
-                        `}
-                        <div class="client-info">
-                            <div class="client-name">@${post.client?.users || 'Desconhecido'}</div>
-                            <div class="post-date">
-                                <i class="ph ph-calendar"></i>
-                                ${this.formatScheduledDate(post.agendamento)}
-                            </div>
+                <div class="post-modal-header">
+                    ${post.client?.profile_photo ? `
+                        <img src="${post.client.profile_photo}" alt="${post.client.users}" class="client-avatar">
+                    ` : `
+                        <div class="client-avatar-placeholder">
+                            <i class="ph-fill ph-user"></i>
                         </div>
-                    </div>
-
-                    <div class="post-modal-media">
-                        ${hasMultipleMedia ? 
-                            this.createCarouselPreview(medias, post.id) : 
-                            this.createSinglePreview(medias[0])
-                        }
-                    </div>
-
-                    <div class="post-modal-body">
-                        <div class="post-modal-actions">
-                            <button class="action-btn action-btn-reject" data-post-id="${post.id}" data-action="reject" title="Recusar">
-                                <i class="ph-fill ph-x-circle"></i>
-                            </button>
-                            <button class="action-btn action-btn-edit" data-post-id="${post.id}" data-action="edit" title="Editar">
-                                <i class="ph-fill ph-pencil-simple"></i>
-                            </button>
-                            <button class="action-btn action-btn-download" data-post-id="${post.id}" data-action="download" title="Download">
-                                <i class="ph-fill ph-download"></i>
-                            </button>
-                            <button class="action-btn action-btn-approve" data-post-id="${post.id}" data-action="approve" title="Aprovar">
-                                <i class="ph-fill ph-heart"></i>
-                            </button>
-                        </div>
-
-                        <div class="post-modal-caption">
-                            ${post.caption ? `
-                                <div class="post-caption"><strong>@${post.client?.users || 'Desconhecido'}</strong> ${this.formatCaption(post.caption)}</div>
-                            ` : `
-                                <div class="post-caption-empty">
-                                    <i class="ph ph-text-align-left"></i> Sem legenda
-                                </div>
-                            `}
+                    `}
+                    <div class="client-info">
+                        <div class="client-name">@${post.client?.users || 'Desconhecido'}</div>
+                        <div class="post-date">
+                            <i class="ph ph-calendar"></i>
+                            ${this.formatScheduledDate(post.agendamento)}
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
 
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-        document.body.classList.add('no-scroll');
-          // ADICIONAR ESTAS LINHAS AQUI:
-    setTimeout(() => {
+                <div class="post-modal-media">
+                    ${hasMultipleMedia ? 
+                        this.createCarouselPreview(medias, post.id) : 
+                        this.createSinglePreview(medias[0])
+                    }
+                </div>
+
+                <div class="post-modal-body">
+                    <div class="post-modal-actions">
+                        <button class="action-btn action-btn-reject" data-post-id="${post.id}" data-action="reject" title="Recusar">
+                            <i class="ph-fill ph-x-circle"></i>
+                        </button>
+                        <button class="action-btn action-btn-edit" data-post-id="${post.id}" data-action="edit" title="Editar">
+                            <i class="ph-fill ph-pencil-simple"></i>
+                        </button>
+                        <button class="action-btn action-btn-download" data-post-id="${post.id}" data-action="download" title="Download">
+                            <i class="ph-fill ph-download"></i>
+                        </button>
+                        <button class="action-btn action-btn-approve" data-post-id="${post.id}" data-action="approve" title="Aprovar">
+                            <i class="ph-fill ph-heart"></i>
+                        </button>
+                    </div>
+
+                    <div class="post-modal-caption">
+                        ${post.caption ? `
+                            <div class="post-caption"><strong>@${post.client?.users || 'Desconhecido'}</strong> ${this.formatCaption(post.caption)}</div>
+                        ` : `
+                            <div class="post-caption-empty">
+                                <i class="ph ph-text-align-left"></i> Sem legenda
+                            </div>
+                        `}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    document.body.classList.add('no-scroll');
+    
+    // ESCONDER BARRA QUANDO USUÁRIO INTERAGIR
+    const modal = document.querySelector('.post-modal');
+    const hideAddressBar = () => {
         window.scrollTo(0, 1);
-        document.body.scrollTop = 1;
-    }, 100);
+        document.documentElement.scrollTop = 1;
+    };
+    
+    // No primeiro toque/clique/scroll
+    modal.addEventListener('touchstart', hideAddressBar, { once: true });
+    modal.addEventListener('click', hideAddressBar, { once: true });
+    modal.addEventListener('scroll', hideAddressBar, { once: true });
     
     setTimeout(() => this.initCustomVideoControls(), 100);
-        
-    }
+}
 
     initCustomVideoControls() {
         const videos = document.querySelectorAll('.post-modal video');
@@ -430,5 +436,6 @@ export class ApprovalRenderer {
         return text.trim();
     }
 }
+
 
 
