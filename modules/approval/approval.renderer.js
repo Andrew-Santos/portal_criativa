@@ -118,9 +118,7 @@ export class ApprovalRenderer {
                     <i class="ph-fill ph-copy post-carousel-indicator"></i>
                 ` : ''}
                 
-                <div class="post-type-badge">
                     <i class="${typeIcon}"></i>
-                </div>
                 
                 <div class="post-item-overlay">
                     <i class="ph-fill ph-play-circle" style="font-size: 48px; color: white;"></i>
@@ -314,3 +312,4 @@ export class ApprovalRenderer {
         return text.replace(/\n/g, '<br>').trim();
     }
 }
+
