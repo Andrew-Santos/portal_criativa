@@ -60,6 +60,31 @@ export class ApprovalActions {
 
             // Ações do modal
             if (e.target.closest('.post-modal')) {
+                // Ações estilo Instagram (ícones)
+                const actionBtn = e.target.closest('.action-btn[data-action]');
+                if (actionBtn) {
+                    e.stopPropagation();
+                    const action = actionBtn.dataset.action;
+                    const postId = actionBtn.dataset.postId;
+                    
+                    switch(action) {
+                        case 'approve':
+                            this.handleApprove(actionBtn);
+                            break;
+                        case 'reject':
+                            this.handleReject(actionBtn);
+                            break;
+                        case 'download':
+                            this.handleDownload(actionBtn);
+                            break;
+                        case 'share':
+                            this.handleShare(actionBtn);
+                            break;
+                    }
+                    return;
+                }
+
+                // Botões principais (footer)
                 const approveBtn = e.target.closest('.btn-approve');
                 if (approveBtn) {
                     e.stopPropagation();
@@ -74,24 +99,19 @@ export class ApprovalActions {
                     return;
                 }
 
-                const downloadBtn = e.target.closest('.btn-download');
-                if (downloadBtn) {
-                    e.stopPropagation();
-                    this.handleDownload(downloadBtn);
-                    return;
-                }
-
-                const shareBtn = e.target.closest('.btn-compartilhar');
-                if (shareBtn) {
-                    e.stopPropagation();
-                    this.handleShare(shareBtn);
-                    return;
-                }
-
+                // Carousel
                 const carouselBtn = e.target.closest('.carousel-btn');
                 if (carouselBtn) {
                     e.stopPropagation();
                     this.handleCarouselNavigation(carouselBtn);
+                    return;
+                }
+
+                // Play/pause de vídeo
+                const videoOverlay = e.target.closest('.video-play-overlay');
+                if (videoOverlay) {
+                    e.stopPropagation();
+                    this.handleVideoClick(videoOverlay);
                     return;
                 }
             }
@@ -108,6 +128,29 @@ export class ApprovalActions {
                 this.closePostModal();
             }
         });
+    }
+
+    handleVideoClick(overlay) {
+        const video = overlay.previousElementSibling;
+        if (!video || video.tagName !== 'VIDEO') return;
+
+        if (video.paused) {
+            // Pausar outros vídeos
+            document.querySelectorAll('.post-modal video').forEach(v => {
+                if (v !== video && !v.paused) {
+                    v.pause();
+                    v.currentTime = 0;
+                    const otherOverlay = v.nextElementSibling;
+                    if (otherOverlay) otherOverlay.style.display = 'flex';
+                }
+            });
+            
+            video.play();
+            overlay.style.display = 'none';
+        } else {
+            video.pause();
+            overlay.style.display = 'flex';
+        }
     }
 
     handleTabClick(tabName) {
@@ -283,6 +326,7 @@ export class ApprovalActions {
         const carouselId = container.dataset.carouselId;
         const track = container.querySelector('.carousel-track');
         const indicators = Array.from(container.querySelectorAll('.indicator'));
+        const items = Array.from(track.querySelectorAll('.carousel-item'));
         
         this.carouselStates.set(carouselId, newIndex);
         container.dataset.currentIndex = newIndex;
@@ -294,11 +338,20 @@ export class ApprovalActions {
             ind.classList.toggle('active', i === newIndex);
         });
 
-        // Pausar todos os vídeos
-        const videos = track.querySelectorAll('video');
-        videos.forEach(video => {
-            video.pause();
-            video.currentTime = 0;
+        // Pausar todos os vídeos e esconder overlay
+        items.forEach((item, i) => {
+            const video = item.querySelector('video');
+            const overlay = item.querySelector('.video-play-overlay');
+            
+            if (video) {
+                video.pause();
+                video.currentTime = 0;
+            }
+            
+            // Mostrar overlay apenas no slide ativo
+            if (overlay) {
+                overlay.style.display = i === newIndex ? 'flex' : 'none';
+            }
         });
 
         console.log(`[ApprovalActions] Navegado para slide ${newIndex + 1} de ${totalItems}`);
@@ -446,7 +499,7 @@ export class ApprovalActions {
 
         button.disabled = true;
         const originalHTML = button.innerHTML;
-        button.innerHTML = '<div class="btn-spinner"></div> Baixando...';
+        button.innerHTML = '<i class="ph-fill ph-circle-notch" style="animation: spin 0.6s linear infinite;"></i>';
 
         try {
             const medias = post.post_media.sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -466,7 +519,6 @@ export class ApprovalActions {
                     await this.downloadMultipleMediasAsZip(medias, postId);
                 } catch (error) {
                     console.error('[ApprovalActions] Erro ao criar ZIP:', error);
-                    // Fallback: abrir links em novas abas
                     medias.forEach(media => window.open(media.url_media, '_blank'));
                     alert('Não foi possível criar ZIP. As mídias foram abertas em novas abas.');
                 }
@@ -544,7 +596,14 @@ export class ApprovalActions {
         
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(shareText.trim())
-                .then(() => alert('Links das mídias copiados!'))
+                .then(() => {
+                    // Feedback visual
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = '<i class="ph-fill ph-check"></i>';
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                    }, 1500);
+                })
                 .catch(() => alert('Não foi possível copiar os links.'));
         } else {
             alert('Função de copiar não suportada neste ambiente.');
