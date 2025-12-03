@@ -757,7 +757,7 @@ body {
 }
 
 .action-btn-edit {
-    color: #ffc107;
+    color: #fff;
     order: 2;
 }
 
@@ -1192,3 +1192,4 @@ body {
 .edit-success-toast i {
     font-size: 20px;
 }
+
