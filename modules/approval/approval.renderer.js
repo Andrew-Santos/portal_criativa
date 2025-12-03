@@ -95,6 +95,9 @@ export class ApprovalRenderer {
             thumbnailUrl = `${firstMedia.url_media}#t=0.001`;
         }
 
+        // Ícones para cada tipo de post
+        const typeIcon = this.getPostTypeIcon(post.type);
+
         return `
             <div class="post-item" data-post-id="${post.id}">
                 ${thumbnailUrl ? `
@@ -115,7 +118,9 @@ export class ApprovalRenderer {
                     <i class="ph-fill ph-copy post-carousel-indicator"></i>
                 ` : ''}
                 
-                <span class="post-type-badge">${this.getPostTypeLabel(post.type)}</span>
+                <div class="post-type-badge">
+                    <i class="${typeIcon}"></i>
+                </div>
                 
                 <div class="post-item-overlay">
                     <i class="ph-fill ph-play-circle" style="font-size: 48px; color: white;"></i>
@@ -127,7 +132,6 @@ export class ApprovalRenderer {
     createPostModal(post) {
         const medias = post.post_media || [];
         const hasMultipleMedia = medias.length > 1;
-        const aspectClass = (post.type === 'reels' || post.type === 'story') ? 'aspect-reels' : 'aspect-feed';
 
         const modalHTML = `
             <div class="post-modal" data-post-id="${post.id}">
@@ -156,38 +160,54 @@ export class ApprovalRenderer {
                     </div>
 
                     <!-- Media -->
-                    <div class="post-modal-media ${aspectClass}">
+                    <div class="post-modal-media">
                         ${hasMultipleMedia ? 
                             this.createCarouselPreview(medias, post.id) : 
                             this.createSinglePreview(medias[0])
                         }
                     </div>
 
-                    <!-- Body -->
                     <div class="post-modal-body">
-                        <div class="post-caption ${post.caption ? '' : 'post-caption-empty'}">
-                            ${post.caption ? this.formatCaption(post.caption) : '<i class="ph ph-text-align-left"></i> Sem legenda'}
+                        <!-- Actions estilo Instagram -->
+                        <div class="post-modal-actions">
+                            <button class="action-btn action-btn-approve" data-post-id="${post.id}" data-action="approve" title="Aprovar">
+                                <i class="ph-fill ph-heart"></i>
+                            </button>
+                            <button class="action-btn" data-post-id="${post.id}" data-action="share" title="Compartilhar">
+                                <i class="ph-fill ph-paper-plane-tilt"></i>
+                            </button>
+                            <button class="action-btn" data-post-id="${post.id}" data-action="download" title="Download">
+                                <i class="ph-fill ph-download-simple"></i>
+                            </button>
+                            <button class="action-btn action-btn-reject" data-post-id="${post.id}" data-action="reject" title="Recusar">
+                                <i class="ph-fill ph-x-circle"></i>
+                            </button>
                         </div>
-                    </div>
 
-                    <!-- Actions -->
-                    <div class="post-modal-actions">
-                        <button class="btn-action btn-compartilhar" data-post-id="${post.id}">
-                            <i class="ph ph-export"></i>
-                            Compartilhar
-                        </button>
-                        <button class="btn-action btn-download" data-post-id="${post.id}">
-                            <i class="ph ph-download"></i>
-                            Download
-                        </button>
-                        <button class="btn-action btn-reject" data-post-id="${post.id}">
-                            <i class="ph ph-x-circle"></i>
-                            Recusar
-                        </button>
-                        <button class="btn-action btn-approve" data-post-id="${post.id}">
-                            <i class="ph ph-check-circle"></i>
-                            Aprovar Post
-                        </button>
+                        <!-- Caption -->
+                        <div class="post-modal-caption">
+                            ${post.caption ? `
+                                <div class="post-caption">
+                                    <strong>@${post.client?.users || 'Desconhecido'}</strong> ${this.formatCaption(post.caption)}
+                                </div>
+                            ` : `
+                                <div class="post-caption-empty">
+                                    <i class="ph ph-text-align-left"></i> Sem legenda
+                                </div>
+                            `}
+                        </div>
+
+                        <!-- Footer com botões principais -->
+                        <div class="post-modal-footer">
+                            <button class="btn-action btn-reject" data-post-id="${post.id}">
+                                <i class="ph ph-x-circle"></i>
+                                Recusar
+                            </button>
+                            <button class="btn-action btn-approve" data-post-id="${post.id}">
+                                <i class="ph ph-check-circle"></i>
+                                Aprovar
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -200,8 +220,8 @@ export class ApprovalRenderer {
     createSinglePreview(media) {
         if (!media) {
             return `
-                <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f0f0f0;">
-                    <i class="ph ph-image" style="font-size: 48px; color: #ccc;"></i>
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #000;">
+                    <i class="ph ph-image" style="font-size: 48px; color: #444;"></i>
                 </div>
             `;
         }
@@ -211,7 +231,10 @@ export class ApprovalRenderer {
         const videoSrc = media.url_capa ? media.url_media : `${media.url_media}#t=0.001`;
         
         return isVideo ? `
-            <video src="${videoSrc}" class="media-video" controls playsinline preload="metadata" ${posterAttr}></video>
+            <video src="${videoSrc}" class="media-video" playsinline preload="metadata" ${posterAttr}></video>
+            <div class="video-play-overlay">
+                <i class="ph-fill ph-play-circle"></i>
+            </div>
         ` : `
             <img src="${media.url_media}" alt="Mídia" class="media-image" loading="lazy">
         `;
@@ -235,7 +258,12 @@ export class ApprovalRenderer {
                         return `
                             <div class="carousel-item ${index === 0 ? 'active' : ''}" data-index="${index}">
                                 ${isVideo ? `
-                                    <video src="${videoSrc}" class="media-video" controls playsinline preload="metadata" ${posterAttr}></video>
+                                    <video src="${videoSrc}" class="media-video" playsinline preload="metadata" ${posterAttr}></video>
+                                    ${index === 0 ? `
+                                        <div class="video-play-overlay">
+                                            <i class="ph-fill ph-play-circle"></i>
+                                        </div>
+                                    ` : ''}
                                 ` : `
                                     <img src="${media.url_media}" alt="Mídia ${index + 1}" class="media-image" loading="lazy">
                                 `}
@@ -261,14 +289,14 @@ export class ApprovalRenderer {
         `;
     }
 
-    getPostTypeLabel(type) {
-        const labels = {
-            'feed': 'Feed',
-            'reels': 'Reels',
-            'story': 'Story',
-            'carousel': 'Carrossel'
+    getPostTypeIcon(type) {
+        const icons = {
+            'feed': 'ph-fill ph-square',
+            'reels': 'ph-fill ph-film-strip',
+            'story': 'ph-fill ph-circle',
+            'carousel': 'ph-fill ph-copy'
         };
-        return labels[type] || type;
+        return icons[type] || 'ph-fill ph-image';
     }
 
     formatScheduledDate(dateString) {
