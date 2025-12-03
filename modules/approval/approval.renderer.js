@@ -191,8 +191,14 @@ export class ApprovalRenderer {
 
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         document.body.classList.add('no-scroll');
+          // ADICIONAR ESTAS LINHAS AQUI:
+    setTimeout(() => {
+        window.scrollTo(0, 1);
+        document.body.scrollTop = 1;
+    }, 100);
+    
+    setTimeout(() => this.initCustomVideoControls(), 100);
         
-        setTimeout(() => this.initCustomVideoControls(), 100);
     }
 
     initCustomVideoControls() {
@@ -424,4 +430,5 @@ export class ApprovalRenderer {
         return text.trim();
     }
 }
+
 
