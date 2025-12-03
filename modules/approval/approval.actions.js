@@ -556,12 +556,10 @@ export class ApprovalActions {
     }
 
     try {
-        // Fechar modal do post antes de abrir o editor
-        this.closePostModal();
+        // NÃO fechar o modal do post
+        // this.closePostModal(); ← REMOVER ESTA LINHA
         
-        // Abrir editor
         const editor = new PostEditor(post, (updatedPost) => {
-            // Callback após salvar
             console.log('[ApprovalActions] Post atualizado:', updatedPost);
             
             // Atualizar o post na lista local
@@ -570,7 +568,10 @@ export class ApprovalActions {
                 this.posts[index] = { ...this.posts[index], ...updatedPost };
             }
             
-            // Recarregar a aba para refletir mudanças
+            // Fechar modal do post após salvar
+            this.closePostModal();
+            
+            // Recarregar a aba
             this.loadApprovalTab();
         });
         
@@ -659,6 +660,7 @@ export class ApprovalActions {
         }
     }
 }
+
 
 
 
