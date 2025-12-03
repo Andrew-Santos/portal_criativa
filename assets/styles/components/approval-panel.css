@@ -983,3 +983,212 @@ body {
         transform: scale(1.02);
     }
 }
+
+
+/* ===== MODAL DE EDIÇÃO ===== */
+.edit-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    padding: 20px;
+}
+
+.edit-modal-overlay.active {
+    opacity: 1;
+}
+
+.edit-modal {
+    background: var(--bg-white);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.edit-modal-overlay.active .edit-modal {
+    transform: scale(1);
+}
+
+.edit-modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.edit-modal-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+}
+
+.edit-modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-light);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.edit-modal-close:hover {
+    background: var(--border);
+}
+
+.edit-modal-close i {
+    font-size: 20px;
+}
+
+.edit-modal-form {
+    padding: 24px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.edit-form-group {
+    margin-bottom: 24px;
+}
+
+.edit-form-group:last-of-type {
+    margin-bottom: 0;
+}
+
+.edit-form-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.edit-form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 120px;
+    transition: border-color 0.2s;
+}
+
+.edit-form-group textarea:focus {
+    outline: none;
+    border-color: var(--text-secondary);
+}
+
+.edit-form-group input[type="datetime-local"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.edit-form-group input[type="datetime-local"]:focus {
+    outline: none;
+    border-color: var(--text-secondary);
+}
+
+.edit-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.edit-modal-actions {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.edit-btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+}
+
+.edit-btn-cancel {
+    background: var(--bg-light);
+    color: var(--text-primary);
+}
+
+.edit-btn-cancel:hover {
+    background: var(--border);
+}
+
+.edit-btn-save {
+    background: var(--primary);
+    color: white;
+}
+
+.edit-btn-save:hover {
+    opacity: 0.9;
+}
+
+.edit-btn-save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Toast de sucesso */
+.edit-success-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--success);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    z-index: 3000;
+    transition: transform 0.3s ease;
+}
+
+.edit-success-toast.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+.edit-success-toast i {
+    font-size: 20px;
+}
