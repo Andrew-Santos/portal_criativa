@@ -391,7 +391,6 @@ body {
     animation: fadeIn 0.2s ease;
     padding: 0;
     scrollbar-width: none;
-    min-height: calc(100vh + 1px); /* ADICIONAR ESTA LINHA */
 }
 
 .post-modal::-webkit-scrollbar {
@@ -407,7 +406,7 @@ body {
 .post-modal-content {
     position: relative;
     width: 100%;
-    min-height: calc(100vh + 1px); /* MUDAR ESTA LINHA */
+    min-height: 100vh;
     max-width: 100vw;
     background: #000;
     display: flex;
@@ -1193,6 +1192,7 @@ body {
 .edit-success-toast i {
     font-size: 20px;
 }
+
 
 
 
