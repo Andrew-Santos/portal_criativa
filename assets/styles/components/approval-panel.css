@@ -363,7 +363,12 @@ body {
 }
 
 .post-type-badge i {
+    position: absolute;
+    top: 8px;
+    right: 8px;
     font-size: 16px;
+    color: rgba(0, 0, 0, 0.7);
+    z-index: 2;
 }
 
 .post-carousel-indicator {
@@ -871,3 +876,4 @@ body {
         transform: scale(1.02);
     }
 }
+
