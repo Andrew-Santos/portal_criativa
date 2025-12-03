@@ -360,15 +360,12 @@ body {
     justify-content: center;
     backdrop-filter: blur(4px);
     z-index: 2;
+    font-size: 16px;
 }
 
 .post-type-badge i {
-    position: absolute;
-    top: 8px;
-    right: 8px;
     font-size: 16px;
-    color: rgba(0, 0, 0, 0.7);
-    z-index: 2;
+    color: white;
 }
 
 .post-carousel-indicator {
@@ -388,22 +385,24 @@ body {
     background: rgba(0, 0, 0, 0.95);
     z-index: 1000;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    overflow-y: auto;
     animation: fadeIn 0.2s ease;
+    padding: 0;
 }
 
 .post-modal-overlay {
-    position: absolute;
+    position: fixed;
     inset: 0;
+    z-index: -1;
 }
 
 .post-modal-content {
     position: relative;
     width: 100%;
-    height: 100%;
+    min-height: 100vh;
     max-width: 480px;
-    max-height: 100vh;
     background: #000;
     display: flex;
     flex-direction: column;
@@ -487,7 +486,7 @@ body {
 .post-modal-media {
     position: relative;
     width: 100%;
-    flex: 1;
+    aspect-ratio: 3/4;
     background: #000;
     display: flex;
     align-items: center;
@@ -627,54 +626,79 @@ body {
 
 /* ===== AÇÕES ESTILO INSTAGRAM ===== */
 .post-modal-actions {
-    padding: 8px 16px;
+    padding: 16px;
     background: #000;
     border-top: 1px solid #262626;
     display: flex;
     align-items: center;
-    gap: 16px;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 .action-btn {
+    flex: 1;
     background: none;
-    border: none;
+    border: 2px solid currentColor;
     color: white;
     cursor: pointer;
-    padding: 8px;
+    padding: 12px 16px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 8px;
     font-size: 14px;
+    font-weight: 600;
+    border-radius: 8px;
     transition: all 0.2s;
 }
 
 .action-btn:hover {
-    opacity: 0.7;
-    transform: scale(1.05);
+    opacity: 0.8;
+    transform: translateY(-2px);
 }
 
 .action-btn:active {
-    transform: scale(0.95);
+    transform: translateY(0);
 }
 
 .action-btn i {
-    font-size: 28px;
+    font-size: 24px;
 }
 
 .action-btn-reject {
     color: #ff4444;
+    border-color: #ff4444;
+    order: 1;
+}
+
+.action-btn-reject:hover {
+    background: rgba(255, 68, 68, 0.1);
+}
+
+.action-btn-download {
+    color: white;
+    border-color: white;
+    order: 2;
+}
+
+.action-btn-download:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .action-btn-approve {
-    color: #ff4444;
+    color: #28a745;
+    border-color: #28a745;
+    order: 3;
+}
+
+.action-btn-approve:hover {
+    background: rgba(40, 167, 69, 0.1);
 }
 
 .action-btn-approve.liked {
     color: #ed4956;
-}
-
-.action-btn-download {
-    margin-left: auto;
+    border-color: #ed4956;
+    background: rgba(237, 73, 86, 0.1);
 }
 
 /* ===== CAPTION ===== */
@@ -698,9 +722,6 @@ body {
     font-style: italic;
     font-size: 13px;
 }
-
-/* ===== BOTÕES DE AÇÃO PRINCIPAIS ===== */
-/* Removido - botões agora estão apenas no topo */
 
 /* ===== EMPTY STATES ===== */
 .empty-state,
@@ -776,6 +797,24 @@ body {
     background: #555;
 }
 
+/* Scrollbar para o modal */
+.post-modal::-webkit-scrollbar {
+    width: 8px;
+}
+
+.post-modal::-webkit-scrollbar-track {
+    background: #000;
+}
+
+.post-modal::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+}
+
+.post-modal::-webkit-scrollbar-thumb:hover {
+    background: #444;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (min-width: 768px) {
     .posts-list {
@@ -811,9 +850,15 @@ body {
         opacity: 1;
     }
 
+    .post-modal {
+        align-items: center;
+        padding: 20px;
+    }
+
     .post-modal-content {
-        max-width: 935px;
+        min-height: auto;
         max-height: 95vh;
+        max-width: 935px;
         flex-direction: row;
         background: #000;
     }
@@ -821,6 +866,7 @@ body {
     .post-modal-media {
         flex: 0 0 60%;
         max-height: 95vh;
+        aspect-ratio: auto;
     }
     
     .media-image,
@@ -833,6 +879,7 @@ body {
         display: flex;
         flex-direction: column;
         background: #000;
+        max-height: 95vh;
     }
 
     .post-modal-header {
@@ -843,22 +890,17 @@ body {
     .post-modal-caption {
         flex: 1;
         max-height: none;
+        overflow-y: auto;
     }
 
     .post-modal-actions {
-        border-top: none;
-        border-right: 1px solid #262626;
-        flex-direction: column;
-        padding: 12px 8px;
+        border-top: 1px solid #262626;
+        flex-direction: row;
+        padding: 16px;
     }
 
     .action-btn {
-        padding: 12px;
-    }
-    
-    .action-btn-download {
-        margin-left: 0;
-        margin-top: auto;
+        flex: 1;
     }
 }
 
@@ -876,4 +918,3 @@ body {
         transform: scale(1.02);
     }
 }
-
