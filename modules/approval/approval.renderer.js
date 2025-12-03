@@ -162,16 +162,16 @@ export class ApprovalRenderer {
                     <div class="post-modal-body">
                         <div class="post-modal-actions">
                             <button class="action-btn action-btn-reject" data-post-id="${post.id}" data-action="reject" title="Recusar">
-                                <i class="ph ph-x-circle"></i>
+                                <i class="ph-fill ph-x-circle"></i>
                             </button>
                             <button class="action-btn action-btn-edit" data-post-id="${post.id}" data-action="edit" title="Editar">
-                                <i class="ph ph-pencil-simple"></i>
+                                <i class="ph-fill ph-pencil-simple"></i>
                             </button>
                             <button class="action-btn action-btn-download" data-post-id="${post.id}" data-action="download" title="Download">
-                                <i class="ph ph-download-simple"></i>
+                                <i class="ph-fill ph-download"></i>
                             </button>
                             <button class="action-btn action-btn-approve" data-post-id="${post.id}" data-action="approve" title="Aprovar">
-                                <i class="ph ph-heart"></i>
+                                <i class="ph-fill ph-heart"></i>
                             </button>
                         </div>
 
@@ -424,3 +424,4 @@ export class ApprovalRenderer {
         return text.trim();
     }
 }
+
