@@ -311,7 +311,7 @@ body {
 .posts-list {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 2px;
+    gap: 0.5px;
     padding: 0;
 }
 
@@ -1192,6 +1192,7 @@ body {
 .edit-success-toast i {
     font-size: 20px;
 }
+
 
 
 
