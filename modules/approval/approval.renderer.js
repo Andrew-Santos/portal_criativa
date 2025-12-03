@@ -1,4 +1,4 @@
-// Approval Renderer - Renderização da interface (CSS Masonry)
+// Approval Renderer - Estilo Instagram Grid
 export class ApprovalRenderer {
     constructor(actions) {
         this.actions = actions;
@@ -73,29 +73,72 @@ export class ApprovalRenderer {
             return;
         }
 
+        // Renderizar apenas thumbnails
         content.innerHTML = `
             <div class="posts-list">
-                ${posts.map(post => this.createPostCard(post)).join('')}
+                ${posts.map(post => this.createPostThumbnail(post)).join('')}
             </div>
         `;
     }
 
-    createPostCard(post) {
+    createPostThumbnail(post) {
+        const medias = post.post_media || [];
+        const firstMedia = medias.sort((a, b) => (a.order || 0) - (b.order || 0))[0];
+        const isCarousel = medias.length > 1;
+        const isVideo = firstMedia?.type === 'video';
+        
+        // Usar capa se disponível, senão usar a própria mídia
+        let thumbnailUrl = firstMedia?.url_capa || firstMedia?.url_media;
+        
+        // Para vídeos sem capa, adicionar #t=0.001 para mostrar primeiro frame
+        if (isVideo && !firstMedia?.url_capa) {
+            thumbnailUrl = `${firstMedia.url_media}#t=0.001`;
+        }
+
+        return `
+            <div class="post-item" data-post-id="${post.id}">
+                ${thumbnailUrl ? `
+                    ${isVideo && !firstMedia?.url_capa ? `
+                        <video class="post-item-thumbnail" preload="metadata" muted>
+                            <source src="${thumbnailUrl}" type="video/mp4">
+                        </video>
+                    ` : `
+                        <img src="${thumbnailUrl}" alt="Post" class="post-item-thumbnail" loading="lazy">
+                    `}
+                ` : `
+                    <div class="post-item-thumbnail" style="background: #f0f0f0; display: flex; align-items: center; justify-content: center;">
+                        <i class="ph ph-image" style="font-size: 32px; color: #ccc;"></i>
+                    </div>
+                `}
+                
+                ${isCarousel ? `
+                    <i class="ph-fill ph-copy post-carousel-indicator"></i>
+                ` : ''}
+                
+                <span class="post-type-badge">${this.getPostTypeLabel(post.type)}</span>
+                
+                <div class="post-item-overlay">
+                    <i class="ph-fill ph-play-circle" style="font-size: 48px; color: white;"></i>
+                </div>
+            </div>
+        `;
+    }
+
+    createPostModal(post) {
         const medias = post.post_media || [];
         const hasMultipleMedia = medias.length > 1;
-        const isCarousel = post.type === 'carousel';
-        const aspectRatio = (post.type === 'reels' || post.type === 'story') ? '9/16' : '3/4';
-        const scheduledDate = this.formatScheduledDate(post.agendamento);
-        
-        return `
-            <article class="post-card" data-post-id="${post.id}" data-post-type="${post.type}">
-                ${hasMultipleMedia || isCarousel ? 
-                    this.createCarouselPreview(medias, post.id, aspectRatio, post.type) : 
-                    this.createSinglePreview(medias[0], aspectRatio, post.type)
-                }
+        const aspectClass = (post.type === 'reels' || post.type === 'story') ? 'aspect-reels' : 'aspect-feed';
 
-                <div class="post-header">
-                    <div class="post-client">
+        const modalHTML = `
+            <div class="post-modal" data-post-id="${post.id}">
+                <div class="post-modal-overlay"></div>
+                <div class="post-modal-content">
+                    <button class="post-modal-close">
+                        <i class="ph ph-x"></i>
+                    </button>
+
+                    <!-- Header -->
+                    <div class="post-modal-header">
                         ${post.client?.profile_photo ? `
                             <img src="${post.client.profile_photo}" alt="${post.client.users}" class="client-avatar">
                         ` : `
@@ -104,63 +147,61 @@ export class ApprovalRenderer {
                             </div>
                         `}
                         <div class="client-info">
-                            <span class="client-name">@${post.client?.users || 'Desconhecido'}</span>
+                            <div class="client-name">@${post.client?.users || 'Desconhecido'}</div>
                             <div class="post-date">
                                 <i class="ph ph-calendar"></i>
-                                ${scheduledDate}
+                                ${this.formatScheduledDate(post.agendamento)}
                             </div>
                         </div>
                     </div>
-                </div>
 
-                ${post.caption ? `
-                    <div class="post-caption-wrapper">
-                        <div class="post-caption ${this.isLongCaption(post.caption) ? 'post-caption-collapsed' : ''}" data-post-id="${post.id}">
-                            <p>${this.formatCaption(post.caption)}</p>
+                    <!-- Media -->
+                    <div class="post-modal-media ${aspectClass}">
+                        ${hasMultipleMedia ? 
+                            this.createCarouselPreview(medias, post.id) : 
+                            this.createSinglePreview(medias[0])
+                        }
+                    </div>
+
+                    <!-- Body -->
+                    <div class="post-modal-body">
+                        <div class="post-caption ${post.caption ? '' : 'post-caption-empty'}">
+                            ${post.caption ? this.formatCaption(post.caption) : '<i class="ph ph-text-align-left"></i> Sem legenda'}
                         </div>
-                        ${this.isLongCaption(post.caption) ? `
-                            <button class="btn-expand-caption" data-post-id="${post.id}">
-                                <i class="ph ph-caret-down"></i> Ver mais
-                            </button>
-                        ` : ''}
                     </div>
-                ` : `
-                    <div class="post-caption post-caption-empty">
-                        <p><i class="ph ph-text-align-left"></i> Sem legenda</p>
-                    </div>
-                `}
 
-                <div class="post-actions">
-                    <button class="btn-action btn-compartilhar" data-post-id="${post.id}">
-                        <i class="ph ph-export"></i>
-                        Compartilhar
-                    </button>
-                    <button class="btn-action btn-download" data-post-id="${post.id}">
-                        <i class="ph ph-download"></i>
-                        Download
-                    </button>
-                    <button class="btn-action btn-reject" data-post-id="${post.id}">
-                        <i class="ph ph-x-circle"></i>
-                        Recusar
-                    </button>
-                    <button class="btn-action btn-approve" data-post-id="${post.id}">
-                        <i class="ph ph-check-circle"></i>
-                        Aprovar
-                    </button>
+                    <!-- Actions -->
+                    <div class="post-modal-actions">
+                        <button class="btn-action btn-compartilhar" data-post-id="${post.id}">
+                            <i class="ph ph-export"></i>
+                            Compartilhar
+                        </button>
+                        <button class="btn-action btn-download" data-post-id="${post.id}">
+                            <i class="ph ph-download"></i>
+                            Download
+                        </button>
+                        <button class="btn-action btn-reject" data-post-id="${post.id}">
+                            <i class="ph ph-x-circle"></i>
+                            Recusar
+                        </button>
+                        <button class="btn-action btn-approve" data-post-id="${post.id}">
+                            <i class="ph ph-check-circle"></i>
+                            Aprovar Post
+                        </button>
+                    </div>
                 </div>
-            </article>
+            </div>
         `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        document.body.classList.add('no-scroll');
     }
 
-    createSinglePreview(media, aspectRatio, postType) {
+    createSinglePreview(media) {
         if (!media) {
             return `
-                <div class="media-preview" style="aspect-ratio: ${aspectRatio};">
-                    <div class="media-placeholder">
-                        <i class="ph ph-image"></i>
-                        <p>Sem mídia</p>
-                    </div>
-                    <span class="post-type-label">${this.getPostTypeLabel(postType)}</span>
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f0f0f0;">
+                    <i class="ph ph-image" style="font-size: 48px; color: #ccc;"></i>
                 </div>
             `;
         }
@@ -169,29 +210,23 @@ export class ApprovalRenderer {
         const posterAttr = media.url_capa ? `poster="${media.url_capa}"` : '';
         const videoSrc = media.url_capa ? media.url_media : `${media.url_media}#t=0.001`;
         
-        return `
-            <div class="media-preview" style="aspect-ratio: ${aspectRatio};">
-                ${isVideo ? `
-                    <video src="${videoSrc}" class="media-video" playsinline loop preload="metadata" ${posterAttr}></video>
-                    <div class="video-play-overlay"><i class="ph-fill ph-play"></i></div>
-                ` : `
-                    <img src="${media.url_media}" alt="Mídia" class="media-image" loading="lazy">
-                `}
-                <span class="post-type-label">${this.getPostTypeLabel(postType)}</span>
-            </div>
+        return isVideo ? `
+            <video src="${videoSrc}" class="media-video" controls playsinline preload="metadata" ${posterAttr}></video>
+        ` : `
+            <img src="${media.url_media}" alt="Mídia" class="media-image" loading="lazy">
         `;
     }
 
-    createCarouselPreview(medias, postId, aspectRatio, postType) {
+    createCarouselPreview(medias, postId) {
         if (!medias || medias.length === 0) {
-            return this.createSinglePreview(null, aspectRatio, postType);
+            return this.createSinglePreview(null);
         }
 
         const sortedMedias = [...medias].sort((a, b) => (a.order || 0) - (b.order || 0));
 
         return `
-            <div class="media-preview carousel-container" data-carousel-id="${postId}" data-current-index="0" style="aspect-ratio: ${aspectRatio};">
-                <div class="carousel-track" style="transform: translateX(0%);">
+            <div class="carousel-container" data-carousel-id="${postId}" data-current-index="0">
+                <div class="carousel-track">
                     ${sortedMedias.map((media, index) => {
                         const isVideo = media.type === 'video';
                         const posterAttr = media.url_capa ? `poster="${media.url_capa}"` : '';
@@ -210,21 +245,29 @@ export class ApprovalRenderer {
                 </div>
                 
                 ${sortedMedias.length > 1 ? `
-                    <button class="carousel-btn carousel-prev" data-carousel="${postId}"><i class="ph ph-caret-left"></i></button>
-                    <button class="carousel-btn carousel-next" data-carousel="${postId}"><i class="ph ph-caret-right"></i></button>
+                    <button class="carousel-btn carousel-prev" data-carousel="${postId}">
+                        <i class="ph ph-caret-left"></i>
+                    </button>
+                    <button class="carousel-btn carousel-next" data-carousel="${postId}">
+                        <i class="ph ph-caret-right"></i>
+                    </button>
                     <div class="carousel-indicators">
                         ${sortedMedias.map((_, index) => `
                             <span class="indicator ${index === 0 ? 'active' : ''}" data-index="${index}"></span>
                         `).join('')}
                     </div>
                 ` : ''}
-                <span class="post-type-label">${this.getPostTypeLabel(postType)}</span>
             </div>
         `;
     }
 
     getPostTypeLabel(type) {
-        const labels = { 'feed': 'Feed', 'reels': 'Reels', 'story': 'Story', 'carousel': 'Carrossel' };
+        const labels = {
+            'feed': 'Feed',
+            'reels': 'Reels',
+            'story': 'Story',
+            'carousel': 'Carrossel'
+        };
         return labels[type] || type;
     }
 
@@ -241,17 +284,20 @@ export class ApprovalRenderer {
                 const weekday = date.toLocaleDateString('pt-BR', { weekday: 'long' });
                 return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
             }
-            return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-        } catch { return dateString; }
+            return date.toLocaleDateString('pt-BR', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        } catch { 
+            return dateString; 
+        }
     }
 
     formatCaption(text) {
         if (!text) return '';
         return text.replace(/\n/g, '<br>').trim();
-    }
-
-    isLongCaption(text) {
-        if (!text) return false;
-        return text.length > 150 || text.split('\n').length > 3;
     }
 }
