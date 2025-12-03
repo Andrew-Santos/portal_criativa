@@ -504,7 +504,7 @@ body {
 .media-video {
     width: 100%;
     height: auto;
-    max-width: 300px;
+    max-width: 500px;
     object-fit: contain;
     background: #000;
     display: block;
@@ -1192,5 +1192,6 @@ body {
 .edit-success-toast i {
     font-size: 20px;
 }
+
 
 
