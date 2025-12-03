@@ -390,6 +390,11 @@ body {
     overflow-y: auto;
     animation: fadeIn 0.2s ease;
     padding: 0;
+    scrollbar-width: none;
+}
+
+.post-modal::-webkit-scrollbar {
+    display: none;
 }
 
 .post-modal-overlay {
@@ -605,6 +610,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
 }
 
 .carousel-btn {
@@ -670,7 +676,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
 }
 
 .action-btn {
@@ -679,11 +685,11 @@ body {
     border: none;
     color: white;
     cursor: pointer;
-    padding: 12px 16px;
+    padding: 12px 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
     font-size: 14px;
     font-weight: 600;
     border-radius: 8px;
@@ -712,9 +718,18 @@ body {
     background: rgba(255, 68, 68, 0.15);
 }
 
+.action-btn-edit {
+    color: #ffc107;
+    order: 2;
+}
+
+.action-btn-edit:hover {
+    background: rgba(255, 193, 7, 0.15);
+}
+
 .action-btn-download {
     color: white;
-    order: 2;
+    order: 3;
 }
 
 .action-btn-download:hover {
@@ -723,7 +738,7 @@ body {
 
 .action-btn-approve {
     color: #28a745;
-    order: 3;
+    order: 4;
 }
 
 .action-btn-approve:hover {
@@ -813,40 +828,13 @@ body {
     }
 }
 
-/* ===== SCROLLBAR CUSTOMIZADA ===== */
+/* ===== SCROLLBAR ESCONDIDA (MAS FUNCIONAL) ===== */
+.post-modal-caption {
+    scrollbar-width: none;
+}
+
 .post-modal-caption::-webkit-scrollbar {
-    width: 6px;
-}
-
-.post-modal-caption::-webkit-scrollbar-track {
-    background: #1a1a1a;
-}
-
-.post-modal-caption::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: 3px;
-}
-
-.post-modal-caption::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-/* Scrollbar para o modal */
-.post-modal::-webkit-scrollbar {
-    width: 8px;
-}
-
-.post-modal::-webkit-scrollbar-track {
-    background: #000;
-}
-
-.post-modal::-webkit-scrollbar-thumb {
-    background: #333;
-    border-radius: 4px;
-}
-
-.post-modal::-webkit-scrollbar-thumb:hover {
-    background: #444;
+    display: none;
 }
 
 /* ===== RESPONSIVE ===== */
@@ -914,6 +902,11 @@ body {
         background: #000;
         max-height: 95vh;
         overflow-y: auto;
+        scrollbar-width: none;
+    }
+
+    .post-modal-body::-webkit-scrollbar {
+        display: none;
     }
 
     .post-modal-header {
@@ -934,6 +927,7 @@ body {
 
     .action-btn {
         flex: 1;
+        padding: 12px 16px;
     }
 }
 
