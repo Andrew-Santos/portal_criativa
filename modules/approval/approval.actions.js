@@ -546,6 +546,40 @@ export class ApprovalActions {
             button.innerHTML = originalHTML;
         }
     }
+    handleEdit(button) {
+    const postId = button.dataset.postId;
+    const post = this.posts.find(p => p.id == postId);
+    
+    if (!post) {
+        alert('Post não encontrado.');
+        return;
+    }
+
+    try {
+        // Fechar modal do post antes de abrir o editor
+        this.closePostModal();
+        
+        // Abrir editor
+        const editor = new PostEditor(post, (updatedPost) => {
+            // Callback após salvar
+            console.log('[ApprovalActions] Post atualizado:', updatedPost);
+            
+            // Atualizar o post na lista local
+            const index = this.posts.findIndex(p => p.id === updatedPost.id);
+            if (index !== -1) {
+                this.posts[index] = { ...this.posts[index], ...updatedPost };
+            }
+            
+            // Recarregar a aba para refletir mudanças
+            this.loadApprovalTab();
+        });
+        
+        editor.open();
+    } catch (error) {
+        console.error('[ApprovalActions] Erro ao abrir editor:', error);
+        alert('Erro ao abrir editor: ' + error.message);
+    }
+}
 
     async downloadMediaAsBlob(url, filename) {
         const response = await fetch(url);
@@ -625,5 +659,6 @@ export class ApprovalActions {
         }
     }
 }
+
 
 
