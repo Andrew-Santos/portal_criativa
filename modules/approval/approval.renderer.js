@@ -73,7 +73,6 @@ export class ApprovalRenderer {
             return;
         }
 
-        // Renderizar apenas thumbnails
         content.innerHTML = `
             <div class="posts-list">
                 ${posts.map(post => this.createPostThumbnail(post)).join('')}
@@ -87,15 +86,12 @@ export class ApprovalRenderer {
         const isCarousel = medias.length > 1;
         const isVideo = firstMedia?.type === 'video';
         
-        // Usar capa se disponível, senão usar a própria mídia
         let thumbnailUrl = firstMedia?.url_capa || firstMedia?.url_media;
         
-        // Para vídeos sem capa, adicionar #t=0.001 para mostrar primeiro frame
         if (isVideo && !firstMedia?.url_capa) {
             thumbnailUrl = `${firstMedia.url_media}#t=0.001`;
         }
 
-        // Ícones para cada tipo de post
         const typeIcon = this.getPostTypeIcon(post.type);
 
         return `
@@ -118,7 +114,7 @@ export class ApprovalRenderer {
                     <i class="ph-fill ph-copy post-carousel-indicator"></i>
                 ` : ''}
                 
-                    <i class="${typeIcon}"></i>
+                <i class="${typeIcon}"></i>
                 
                 <div class="post-item-overlay">
                     <i class="ph-fill ph-play-circle" style="font-size: 48px; color: white;"></i>
@@ -139,7 +135,6 @@ export class ApprovalRenderer {
                         <i class="ph ph-x"></i>
                     </button>
 
-                    <!-- Header -->
                     <div class="post-modal-header">
                         ${post.client?.profile_photo ? `
                             <img src="${post.client.profile_photo}" alt="${post.client.users}" class="client-avatar">
@@ -157,7 +152,6 @@ export class ApprovalRenderer {
                         </div>
                     </div>
 
-                    <!-- Media -->
                     <div class="post-modal-media">
                         ${hasMultipleMedia ? 
                             this.createCarouselPreview(medias, post.id) : 
@@ -166,7 +160,6 @@ export class ApprovalRenderer {
                     </div>
 
                     <div class="post-modal-body">
-                        <!-- Actions estilo Instagram -->
                         <div class="post-modal-actions">
                             <button class="action-btn action-btn-reject" data-post-id="${post.id}" data-action="reject" title="Recusar">
                                 <i class="ph ph-x-circle"></i>
@@ -182,7 +175,6 @@ export class ApprovalRenderer {
                             </button>
                         </div>
 
-                        <!-- Caption -->
                         <div class="post-modal-caption">
                             ${post.caption ? `
                                 <div class="post-caption"><strong>@${post.client?.users || 'Desconhecido'}</strong> ${this.formatCaption(post.caption)}</div>
@@ -200,7 +192,6 @@ export class ApprovalRenderer {
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         document.body.classList.add('no-scroll');
         
-        // Inicializar controles de vídeo customizados
         setTimeout(() => this.initCustomVideoControls(), 100);
     }
 
@@ -211,32 +202,35 @@ export class ApprovalRenderer {
             const container = video.closest('.post-modal-media, .carousel-item');
             if (!container) return;
             
-            // Criar barra de progresso se não existir
             let progressContainer = container.querySelector('.video-progress-container');
             if (!progressContainer) {
                 progressContainer = document.createElement('div');
                 progressContainer.className = 'video-progress-container';
                 progressContainer.innerHTML = `
-                    <div class="video-progress-buffer"></div>
-                    <div class="video-progress-bar"></div>
+                    <div class="video-progress-track">
+                        <div class="video-progress-buffer"></div>
+                        <div class="video-progress-bar">
+                            <div class="video-progress-thumb"></div>
+                        </div>
+                    </div>
                 `;
                 container.appendChild(progressContainer);
             }
             
+            const progressTrack = progressContainer.querySelector('.video-progress-track');
             const progressBar = progressContainer.querySelector('.video-progress-bar');
             const bufferBar = progressContainer.querySelector('.video-progress-buffer');
+            const thumb = progressContainer.querySelector('.video-progress-thumb');
             
-            // Atualizar progresso
+            let isSeeking = false;
+            
             const updateProgress = () => {
-                if (video.duration) {
+                if (video.duration && !isSeeking) {
                     const percent = (video.currentTime / video.duration) * 100;
                     progressBar.style.width = percent + '%';
                 }
             };
             
-            video.addEventListener('timeupdate', updateProgress);
-            
-            // Atualizar buffer
             const updateBuffer = () => {
                 if (video.buffered.length > 0 && video.duration) {
                     const buffered = video.buffered.end(video.buffered.length - 1);
@@ -245,65 +239,71 @@ export class ApprovalRenderer {
                 }
             };
             
-            video.addEventListener('progress', updateBuffer);
-            video.addEventListener('loadedmetadata', updateBuffer);
-            
-            // Click na barra para buscar (MELHORADO)
-            const seekVideo = (e) => {
-                e.stopPropagation();
-                const rect = progressContainer.getBoundingClientRect();
-                const pos = (e.clientX - rect.left) / rect.width;
-                video.currentTime = pos * video.duration;
+            const seekToPosition = (clientX) => {
+                const rect = progressTrack.getBoundingClientRect();
+                let pos = (clientX - rect.left) / rect.width;
+                pos = Math.max(0, Math.min(1, pos));
                 
-                // Se estava pausado, manter pausado
-                if (!video.paused) {
-                    updateProgress();
+                if (video.duration) {
+                    video.currentTime = pos * video.duration;
+                    const percent = pos * 100;
+                    progressBar.style.width = percent + '%';
                 }
             };
             
-            progressContainer.addEventListener('click', seekVideo);
+            video.addEventListener('timeupdate', updateProgress);
+            video.addEventListener('progress', updateBuffer);
+            video.addEventListener('loadedmetadata', updateBuffer);
             
-            // Suporte a arrastar na barra (NOVO)
-            let isSeeking = false;
-            
+            // Mouse events
             progressContainer.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 isSeeking = true;
-                seekVideo(e);
+                progressContainer.classList.add('seeking');
+                seekToPosition(e.clientX);
             });
             
             document.addEventListener('mousemove', (e) => {
                 if (isSeeking) {
-                    seekVideo(e);
+                    e.preventDefault();
+                    seekToPosition(e.clientX);
                 }
             });
             
             document.addEventListener('mouseup', () => {
-                isSeeking = false;
-            });
-            
-            // Touch support para mobile
-            progressContainer.addEventListener('touchstart', (e) => {
-                isSeeking = true;
-                const touch = e.touches[0];
-                const rect = progressContainer.getBoundingClientRect();
-                const pos = (touch.clientX - rect.left) / rect.width;
-                video.currentTime = pos * video.duration;
-            });
-            
-            progressContainer.addEventListener('touchmove', (e) => {
                 if (isSeeking) {
-                    const touch = e.touches[0];
-                    const rect = progressContainer.getBoundingClientRect();
-                    const pos = (touch.clientX - rect.left) / rect.width;
-                    video.currentTime = pos * video.duration;
+                    isSeeking = false;
+                    progressContainer.classList.remove('seeking');
                 }
             });
             
-            progressContainer.addEventListener('touchend', () => {
-                isSeeking = false;
-            });
+            // Touch events para mobile
+            progressContainer.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                isSeeking = true;
+                progressContainer.classList.add('seeking');
+                const touch = e.touches[0];
+                seekToPosition(touch.clientX);
+            }, { passive: false });
             
-            // Resetar quando termina
+            document.addEventListener('touchmove', (e) => {
+                if (isSeeking) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    seekToPosition(touch.clientX);
+                }
+            }, { passive: false });
+            
+            document.addEventListener('touchend', (e) => {
+                if (isSeeking) {
+                    e.preventDefault();
+                    isSeeking = false;
+                    progressContainer.classList.remove('seeking');
+                }
+            }, { passive: false });
+            
             video.addEventListener('ended', () => {
                 progressBar.style.width = '0%';
                 const overlay = container.querySelector('.video-play-overlay');
