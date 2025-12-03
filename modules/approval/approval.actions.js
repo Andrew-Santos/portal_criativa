@@ -4,6 +4,7 @@ import { AgendadosActions } from '../agendados/agendados.actions.js';
 import { CalendarioActions } from '../calendario/calendario.actions.js';
 import { DriveActions } from '../drive/drive.actions.js';
 import { RejectionChat } from './rejection.chat.js';
+import { PostEditor } from './post.edit.js';
 
 export class ApprovalActions {
     constructor(panel, authData) {
@@ -624,4 +625,5 @@ export class ApprovalActions {
         }
     }
 }
+
 
