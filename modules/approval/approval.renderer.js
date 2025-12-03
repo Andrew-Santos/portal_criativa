@@ -171,6 +171,9 @@ export class ApprovalRenderer {
                             <button class="action-btn action-btn-reject" data-post-id="${post.id}" data-action="reject" title="Recusar">
                                 <i class="ph ph-x-circle"></i>
                             </button>
+                            <button class="action-btn action-btn-edit" data-post-id="${post.id}" data-action="edit" title="Editar">
+                                <i class="ph ph-pencil-simple"></i>
+                            </button>
                             <button class="action-btn action-btn-download" data-post-id="${post.id}" data-action="download" title="Download">
                                 <i class="ph ph-download-simple"></i>
                             </button>
@@ -224,27 +227,80 @@ export class ApprovalRenderer {
             const bufferBar = progressContainer.querySelector('.video-progress-buffer');
             
             // Atualizar progresso
-            video.addEventListener('timeupdate', () => {
+            const updateProgress = () => {
                 if (video.duration) {
                     const percent = (video.currentTime / video.duration) * 100;
                     progressBar.style.width = percent + '%';
                 }
-            });
+            };
+            
+            video.addEventListener('timeupdate', updateProgress);
             
             // Atualizar buffer
-            video.addEventListener('progress', () => {
+            const updateBuffer = () => {
                 if (video.buffered.length > 0 && video.duration) {
                     const buffered = video.buffered.end(video.buffered.length - 1);
                     const percent = (buffered / video.duration) * 100;
                     bufferBar.style.width = percent + '%';
                 }
-            });
+            };
             
-            // Click na barra para buscar
-            progressContainer.addEventListener('click', (e) => {
+            video.addEventListener('progress', updateBuffer);
+            video.addEventListener('loadedmetadata', updateBuffer);
+            
+            // Click na barra para buscar (MELHORADO)
+            const seekVideo = (e) => {
+                e.stopPropagation();
                 const rect = progressContainer.getBoundingClientRect();
                 const pos = (e.clientX - rect.left) / rect.width;
                 video.currentTime = pos * video.duration;
+                
+                // Se estava pausado, manter pausado
+                if (!video.paused) {
+                    updateProgress();
+                }
+            };
+            
+            progressContainer.addEventListener('click', seekVideo);
+            
+            // Suporte a arrastar na barra (NOVO)
+            let isSeeking = false;
+            
+            progressContainer.addEventListener('mousedown', (e) => {
+                isSeeking = true;
+                seekVideo(e);
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (isSeeking) {
+                    seekVideo(e);
+                }
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isSeeking = false;
+            });
+            
+            // Touch support para mobile
+            progressContainer.addEventListener('touchstart', (e) => {
+                isSeeking = true;
+                const touch = e.touches[0];
+                const rect = progressContainer.getBoundingClientRect();
+                const pos = (touch.clientX - rect.left) / rect.width;
+                video.currentTime = pos * video.duration;
+            });
+            
+            progressContainer.addEventListener('touchmove', (e) => {
+                if (isSeeking) {
+                    const touch = e.touches[0];
+                    const rect = progressContainer.getBoundingClientRect();
+                    const pos = (touch.clientX - rect.left) / rect.width;
+                    video.currentTime = pos * video.duration;
+                }
+            });
+            
+            progressContainer.addEventListener('touchend', () => {
+                isSeeking = false;
             });
             
             // Resetar quando termina
