@@ -168,23 +168,21 @@ export class ApprovalRenderer {
                     <div class="post-modal-body">
                         <!-- Actions estilo Instagram -->
                         <div class="post-modal-actions">
-                            <button class="action-btn action-btn-approve" data-post-id="${post.id}" data-action="approve" title="Aprovar">
-                                <i class="ph ph-heart"></i>
-                            </button>
                             <button class="action-btn action-btn-reject" data-post-id="${post.id}" data-action="reject" title="Recusar">
                                 <i class="ph ph-x-circle"></i>
                             </button>
                             <button class="action-btn action-btn-download" data-post-id="${post.id}" data-action="download" title="Download">
                                 <i class="ph ph-download-simple"></i>
                             </button>
+                            <button class="action-btn action-btn-approve" data-post-id="${post.id}" data-action="approve" title="Aprovar">
+                                <i class="ph ph-heart"></i>
+                            </button>
                         </div>
 
                         <!-- Caption -->
                         <div class="post-modal-caption">
                             ${post.caption ? `
-                                <div class="post-caption">
-                                    <strong>@${post.client?.users || 'Desconhecido'}</strong> ${this.formatCaption(post.caption)}
-                                </div>
+                                <div class="post-caption"><strong>@${post.client?.users || 'Desconhecido'}</strong> ${this.formatCaption(post.caption)}</div>
                             ` : `
                                 <div class="post-caption-empty">
                                     <i class="ph ph-text-align-left"></i> Sem legenda
@@ -198,6 +196,64 @@ export class ApprovalRenderer {
 
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         document.body.classList.add('no-scroll');
+        
+        // Inicializar controles de vídeo customizados
+        setTimeout(() => this.initCustomVideoControls(), 100);
+    }
+
+    initCustomVideoControls() {
+        const videos = document.querySelectorAll('.post-modal video');
+        
+        videos.forEach(video => {
+            const container = video.closest('.post-modal-media, .carousel-item');
+            if (!container) return;
+            
+            // Criar barra de progresso se não existir
+            let progressContainer = container.querySelector('.video-progress-container');
+            if (!progressContainer) {
+                progressContainer = document.createElement('div');
+                progressContainer.className = 'video-progress-container';
+                progressContainer.innerHTML = `
+                    <div class="video-progress-buffer"></div>
+                    <div class="video-progress-bar"></div>
+                `;
+                container.appendChild(progressContainer);
+            }
+            
+            const progressBar = progressContainer.querySelector('.video-progress-bar');
+            const bufferBar = progressContainer.querySelector('.video-progress-buffer');
+            
+            // Atualizar progresso
+            video.addEventListener('timeupdate', () => {
+                if (video.duration) {
+                    const percent = (video.currentTime / video.duration) * 100;
+                    progressBar.style.width = percent + '%';
+                }
+            });
+            
+            // Atualizar buffer
+            video.addEventListener('progress', () => {
+                if (video.buffered.length > 0 && video.duration) {
+                    const buffered = video.buffered.end(video.buffered.length - 1);
+                    const percent = (buffered / video.duration) * 100;
+                    bufferBar.style.width = percent + '%';
+                }
+            });
+            
+            // Click na barra para buscar
+            progressContainer.addEventListener('click', (e) => {
+                const rect = progressContainer.getBoundingClientRect();
+                const pos = (e.clientX - rect.left) / rect.width;
+                video.currentTime = pos * video.duration;
+            });
+            
+            // Resetar quando termina
+            video.addEventListener('ended', () => {
+                progressBar.style.width = '0%';
+                const overlay = container.querySelector('.video-play-overlay');
+                if (overlay) overlay.classList.add('show');
+            });
+        });
     }
 
     createSinglePreview(media) {
@@ -214,7 +270,7 @@ export class ApprovalRenderer {
         const videoSrc = media.url_capa ? media.url_media : `${media.url_media}#t=0.001`;
         
         return isVideo ? `
-            <video src="${videoSrc}" class="media-video" playsinline preload="auto" controls ${posterAttr}></video>
+            <video src="${videoSrc}" class="media-video" playsinline preload="auto" ${posterAttr}></video>
             <div class="video-play-overlay show">
                 <i class="ph-fill ph-play-circle"></i>
             </div>
@@ -241,7 +297,7 @@ export class ApprovalRenderer {
                         return `
                             <div class="carousel-item ${index === 0 ? 'active' : ''}" data-index="${index}">
                                 ${isVideo ? `
-                                    <video src="${videoSrc}" class="media-video" playsinline preload="auto" controls ${posterAttr}></video>
+                                    <video src="${videoSrc}" class="media-video" playsinline preload="auto" ${posterAttr}></video>
                                     ${index === 0 ? `
                                         <div class="video-play-overlay show">
                                             <i class="ph-fill ph-play-circle"></i>
@@ -309,7 +365,6 @@ export class ApprovalRenderer {
 
     formatCaption(text) {
         if (!text) return '';
-        return text.replace(/\n/g, '<br>').trim();
+        return text.trim();
     }
 }
-
