@@ -28,6 +28,10 @@ export class ApprovalRenderer {
                         <i class="ph ph-cloud"></i>
                         <span>Drive</span>
                     </button>
+                    <button class="tab-item" data-tab="planejamento">
+                        <i class="ph ph-folder-notch-open"></i>
+                        <span>Planejamento</span>
+                    </button>
                     <button class="tab-item" data-tab="calendario">
                         <i class="ph ph-calendar-blank"></i>
                         <span>Calendário</span>

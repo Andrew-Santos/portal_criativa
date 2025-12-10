@@ -1,8 +1,8 @@
-// approval.actions.js - Gerencia ações e lógica do painel (Estilo Instagram)
 import { ApprovalRenderer } from './approval.renderer.js';
 import { AgendadosActions } from '../agendados/agendados.actions.js';
 import { CalendarioActions } from '../calendario/calendario.actions.js';
 import { DriveActions } from '../drive/drive.actions.js';
+import { PlanejamentoActions } from '../planejamento/planejamento.actions.js';
 import { RejectionChat } from './rejection.chat.js';
 import { PostEditor } from './post.edit.js';
 
@@ -14,6 +14,7 @@ export class ApprovalActions {
         this.agendadosActions = null;
         this.calendarioActions = null;
         this.driveActions = null;
+        this.planejamentoActions = null; // ← ADICIONE ESTA LINHA
         this.posts = [];
         this.currentTab = 'aprovacao';
         this.clientIds = authData.clients.map(c => c.id);
@@ -170,6 +171,9 @@ export class ApprovalActions {
             case 'drive':
                 this.loadDriveTab();
                 break;
+            case 'planejamento':  // ← ADICIONE ESTAS 3 LINHAS
+                this.loadPlanejamentoTab();
+                break;
         }
     }
 
@@ -288,6 +292,20 @@ export class ApprovalActions {
             this.driveActions = new DriveActions(this.panel, this.authData);
         }
         this.driveActions.init();
+    }
+
+    // ← ADICIONE ESTE MÉTODO COMPLETO AQUI
+    loadPlanejamentoTab() {
+        if (!this.planejamentoActions) {
+            this.planejamentoActions = new PlanejamentoActions(this.panel, this.authData);
+        }
+        this.planejamentoActions.init();
+    }
+
+    handleLogout() {
+        if (confirm('Deseja realmente sair?')) {
+            this.panel.logout();
+        }
     }
 
     handleLogout() {
