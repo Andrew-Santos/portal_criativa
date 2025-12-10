@@ -1,6 +1,5 @@
 import { ApprovalRenderer } from './approval.renderer.js';
 import { AgendadosActions } from '../agendados/agendados.actions.js';
-import { CalendarioActions } from '../calendario/calendario.actions.js';
 import { DriveActions } from '../drive/drive.actions.js';
 import { PlanejamentoActions } from '../planejamento/planejamento.actions.js';
 import { RejectionChat } from './rejection.chat.js';
@@ -12,9 +11,8 @@ export class ApprovalActions {
         this.authData = authData;
         this.renderer = new ApprovalRenderer(this);
         this.agendadosActions = null;
-        this.calendarioActions = null;
         this.driveActions = null;
-        this.planejamentoActions = null; // ← ADICIONE ESTA LINHA
+        this.planejamentoActions = null;
         this.posts = [];
         this.currentTab = 'aprovacao';
         this.clientIds = authData.clients.map(c => c.id);
@@ -62,7 +60,6 @@ export class ApprovalActions {
 
             // Ações do modal
             if (e.target.closest('.post-modal')) {
-                // Ações do modal
                 const actionBtn = e.target.closest('.action-btn[data-action]');
                 if (actionBtn) {
                     e.stopPropagation();
@@ -125,7 +122,6 @@ export class ApprovalActions {
         const overlay = video.nextElementSibling;
         
         if (video.paused) {
-            // Pausar outros vídeos no modal
             document.querySelectorAll('.post-modal video').forEach(v => {
                 if (v !== video && !v.paused) {
                     v.pause();
@@ -159,9 +155,6 @@ export class ApprovalActions {
         this.currentTab = tabName;
 
         switch (tabName) {
-            case 'calendario':
-                this.loadCalendarioTab();
-                break;
             case 'agendados':
                 this.loadAgendadosTab();
                 break;
@@ -171,7 +164,7 @@ export class ApprovalActions {
             case 'drive':
                 this.loadDriveTab();
                 break;
-            case 'planejamento':  // ← ADICIONE ESTAS 3 LINHAS
+            case 'planejamento':
                 this.loadPlanejamentoTab();
                 break;
         }
@@ -249,7 +242,6 @@ export class ApprovalActions {
         this.renderer.createPostModal(post);
         this.currentModal = postId;
 
-        // Attach carousel events após criar o modal
         setTimeout(() => {
             this.attachCarouselSwipeEvents();
         }, 100);
@@ -259,7 +251,6 @@ export class ApprovalActions {
         const modal = document.querySelector('.post-modal');
         if (!modal) return;
 
-        // Pausar todos os vídeos
         modal.querySelectorAll('video').forEach(video => {
             video.pause();
             video.currentTime = 0;
@@ -271,13 +262,6 @@ export class ApprovalActions {
             document.body.classList.remove('no-scroll');
             this.currentModal = null;
         }, 200);
-    }
-
-    loadCalendarioTab() {
-        if (!this.calendarioActions) {
-            this.calendarioActions = new CalendarioActions(this.panel, this.authData);
-        }
-        this.calendarioActions.init();
     }
 
     loadAgendadosTab() {
@@ -294,18 +278,11 @@ export class ApprovalActions {
         this.driveActions.init();
     }
 
-    // ← ADICIONE ESTE MÉTODO COMPLETO AQUI
     loadPlanejamentoTab() {
         if (!this.planejamentoActions) {
             this.planejamentoActions = new PlanejamentoActions(this.panel, this.authData);
         }
         this.planejamentoActions.init();
-    }
-
-    handleLogout() {
-        if (confirm('Deseja realmente sair?')) {
-            this.panel.logout();
-        }
     }
 
     handleLogout() {
@@ -350,7 +327,6 @@ export class ApprovalActions {
             ind.classList.toggle('active', i === newIndex);
         });
 
-        // Pausar todos os vídeos e esconder overlay
         items.forEach((item, i) => {
             const video = item.querySelector('video');
             const overlay = item.querySelector('.video-play-overlay');
@@ -360,7 +336,6 @@ export class ApprovalActions {
                 video.currentTime = 0;
             }
             
-            // Mostrar overlay apenas no slide ativo se for vídeo
             if (overlay) {
                 if (i === newIndex) {
                     overlay.classList.add('show');
@@ -433,10 +408,8 @@ export class ApprovalActions {
         button.disabled = true;
         const originalHTML = button.innerHTML;
         
-        // Animação de like (coração preenchido)
         button.innerHTML = '<i class="ph-fill ph-heart" style="color: #ed4956; animation: likeAnimation 0.4s ease;"></i>';
         
-        // Adicionar animação CSS inline
         const style = document.createElement('style');
         style.textContent = `
             @keyframes likeAnimation {
@@ -458,10 +431,8 @@ export class ApprovalActions {
                 
                 this.closePostModal();
                 
-                // Remover da lista
                 this.posts = this.posts.filter(p => p.id != postId);
                 
-                // Remover thumbnail
                 const thumbnail = document.querySelector(`.post-item[data-post-id="${postId}"]`);
                 if (thumbnail) {
                     thumbnail.style.animation = 'fadeOut 0.3s ease';
@@ -493,7 +464,6 @@ export class ApprovalActions {
         }
 
         try {
-            // Fechar modal antes de abrir chat
             this.closePostModal();
             
             const chat = new RejectionChat(postId, post);
@@ -505,10 +475,8 @@ export class ApprovalActions {
     }
 
     handlePostRejectedFromChat(postId) {
-        // Remover da lista
         this.posts = this.posts.filter(p => p.id != postId);
         
-        // Remover thumbnail
         const thumbnail = document.querySelector(`.post-item[data-post-id="${postId}"]`);
         if (thumbnail) {
             thumbnail.style.animation = 'fadeOut 0.3s ease';
@@ -564,41 +532,35 @@ export class ApprovalActions {
             button.innerHTML = originalHTML;
         }
     }
-    handleEdit(button) {
-    const postId = button.dataset.postId;
-    const post = this.posts.find(p => p.id == postId);
-    
-    if (!post) {
-        alert('Post não encontrado.');
-        return;
-    }
 
-    try {
-        // NÃO fechar o modal do post
-        // this.closePostModal(); ← REMOVER ESTA LINHA
+    handleEdit(button) {
+        const postId = button.dataset.postId;
+        const post = this.posts.find(p => p.id == postId);
         
-        const editor = new PostEditor(post, (updatedPost) => {
-            console.log('[ApprovalActions] Post atualizado:', updatedPost);
+        if (!post) {
+            alert('Post não encontrado.');
+            return;
+        }
+
+        try {
+            const editor = new PostEditor(post, (updatedPost) => {
+                console.log('[ApprovalActions] Post atualizado:', updatedPost);
+                
+                const index = this.posts.findIndex(p => p.id === updatedPost.id);
+                if (index !== -1) {
+                    this.posts[index] = { ...this.posts[index], ...updatedPost };
+                }
+                
+                this.closePostModal();
+                this.loadApprovalTab();
+            });
             
-            // Atualizar o post na lista local
-            const index = this.posts.findIndex(p => p.id === updatedPost.id);
-            if (index !== -1) {
-                this.posts[index] = { ...this.posts[index], ...updatedPost };
-            }
-            
-            // Fechar modal do post após salvar
-            this.closePostModal();
-            
-            // Recarregar a aba
-            this.loadApprovalTab();
-        });
-        
-        editor.open();
-    } catch (error) {
-        console.error('[ApprovalActions] Erro ao abrir editor:', error);
-        alert('Erro ao abrir editor: ' + error.message);
+            editor.open();
+        } catch (error) {
+            console.error('[ApprovalActions] Erro ao abrir editor:', error);
+            alert('Erro ao abrir editor: ' + error.message);
+        }
     }
-}
 
     async downloadMediaAsBlob(url, filename) {
         const response = await fetch(url);
@@ -646,39 +608,4 @@ export class ApprovalActions {
         document.body.removeChild(a);
         URL.revokeObjectURL(objectUrl);
     }
-
-    handleShare(button) {
-        const postId = button.dataset.postId;
-        const post = this.posts.find(p => p.id == postId);
-
-        if (!post || !post.post_media || post.post_media.length === 0) {
-            alert('Nenhuma mídia encontrada para compartilhar.');
-            return;
-        }
-
-        let shareText = 'Segue a mídia do portal Criativa\n\n';
-        const sortedMedias = post.post_media.sort((a, b) => (a.order || 0) - (b.order || 0));
-        sortedMedias.forEach((media, index) => {
-            shareText += `Link ${index + 1}: ${media.url_media}\n`;
-        });
-        
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(shareText.trim())
-                .then(() => {
-                    // Feedback visual
-                    const originalHTML = button.innerHTML;
-                    button.innerHTML = '<i class="ph-fill ph-check"></i>';
-                    setTimeout(() => {
-                        button.innerHTML = originalHTML;
-                    }, 1500);
-                })
-                .catch(() => alert('Não foi possível copiar os links.'));
-        } else {
-            alert('Função de copiar não suportada neste ambiente.');
-        }
-    }
 }
-
-
-
-

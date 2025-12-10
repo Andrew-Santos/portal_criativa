@@ -1,4 +1,4 @@
-// planejamento.actions.js - Gerencia planejamentos
+// planejamento.actions.js - Edição Inline de Tópicos
 import { PlanejamentoRenderer } from './planejamento.renderer.js';
 import { PlanejamentoEditor } from './planejamento.editor.js';
 
@@ -9,7 +9,7 @@ export class PlanejamentoActions {
         this.renderer = new PlanejamentoRenderer(this);
         this.planejamentos = [];
         this.clientIds = authData.clients.map(c => c.id);
-        this.currentView = 'list'; // 'list' ou 'details'
+        this.currentView = 'list';
         this.selectedPlanejamento = null;
     }
 
@@ -72,7 +72,6 @@ export class PlanejamentoActions {
 
             if (error) throw error;
 
-            // Ordenar tópicos dentro de cada planejamento
             return (data || []).map(p => ({
                 ...p,
                 topics: (p.topics || []).sort((a, b) => 
@@ -110,7 +109,7 @@ export class PlanejamentoActions {
                 return;
             }
 
-            // Editar planejamento
+            // Editar planejamento (abre modal)
             if (e.target.closest('#btn-edit-planejamento')) {
                 this.editPlanejamento(this.selectedPlanejamento);
                 return;
@@ -128,12 +127,30 @@ export class PlanejamentoActions {
                 return;
             }
 
-            // Editar tópico
+            // EDIÇÃO INLINE - Editar tópico
             const editTopicBtn = e.target.closest('.topic-edit-btn');
             if (editTopicBtn) {
                 const topicId = parseInt(editTopicBtn.dataset.topicId);
-                const topic = this.selectedPlanejamento.topics.find(t => t.id === topicId);
-                if (topic) this.editTopic(topic);
+                console.log('[PlanejamentoActions] Ativando edição inline do tópico:', topicId);
+                this.renderer.enableTopicEditMode(topicId);
+                return;
+            }
+
+            // EDIÇÃO INLINE - Cancelar edição do tópico
+            const cancelTopicBtn = e.target.closest('.topic-cancel-btn');
+            if (cancelTopicBtn) {
+                const topicId = parseInt(cancelTopicBtn.dataset.topicId);
+                console.log('[PlanejamentoActions] Cancelando edição inline do tópico:', topicId);
+                this.renderer.disableTopicEditMode(topicId);
+                return;
+            }
+
+            // EDIÇÃO INLINE - Salvar edição do tópico
+            const saveTopicBtn = e.target.closest('.topic-save-btn');
+            if (saveTopicBtn) {
+                const topicId = parseInt(saveTopicBtn.dataset.topicId);
+                console.log('[PlanejamentoActions] Salvando edição inline do tópico:', topicId);
+                await this.saveTopicInline(topicId);
                 return;
             }
 
@@ -175,14 +192,14 @@ export class PlanejamentoActions {
     createNewPlanejamento() {
         const editor = new PlanejamentoEditor(null, this.authData.clients, async (data) => {
             await this.savePlanejamento(data);
-        });
+        }, 'planejamento');
         editor.open();
     }
 
     editPlanejamento(planejamento) {
         const editor = new PlanejamentoEditor(planejamento, this.authData.clients, async (data) => {
             await this.updatePlanejamento(planejamento.id, data);
-        });
+        }, 'planejamento');
         editor.open();
     }
 
@@ -196,13 +213,32 @@ export class PlanejamentoActions {
                     capture_in: data.capture_in,
                     delivery_in: data.delivery_in
                 })
-                .select()
+                .select(`
+                    *,
+                    client:id_client (
+                        id,
+                        users,
+                        profile_photo
+                    ),
+                    topics:planejamento_topics (
+                        id,
+                        tittle,
+                        briefing,
+                        type_content,
+                        script_tp,
+                        caption,
+                        order_position
+                    )
+                `)
                 .single();
 
             if (error) throw error;
 
             console.log('[PlanejamentoActions] Planejamento criado:', newPlanejamento.id);
-            await this.loadPlanejamentos();
+            
+            this.planejamentos.unshift(newPlanejamento);
+            await this.openDetails(newPlanejamento.id);
+            
             this.showSuccessToast('Planejamento criado com sucesso!');
         } catch (error) {
             console.error('[PlanejamentoActions] Erro ao criar:', error);
@@ -225,7 +261,6 @@ export class PlanejamentoActions {
 
             console.log('[PlanejamentoActions] Planejamento atualizado:', id);
             
-            // Atualizar localmente
             const index = this.planejamentos.findIndex(p => p.id === id);
             if (index !== -1) {
                 this.planejamentos[index] = { ...this.planejamentos[index], ...data };
@@ -271,16 +306,46 @@ export class PlanejamentoActions {
         editor.open();
     }
 
-    editTopic(topic) {
-        const editor = new PlanejamentoEditor(topic, this.authData.clients, async (data) => {
-            await this.updateTopic(topic.id, data);
-        }, 'topic');
-        editor.open();
+    async saveTopicInline(topicId) {
+        const data = this.renderer.getTopicEditData(topicId);
+        
+        if (!data || !data.tittle) {
+            alert('O título do tópico é obrigatório');
+            return;
+        }
+
+        const saveBtn = document.querySelector(`.topic-save-btn[data-topic-id="${topicId}"]`);
+        const originalHTML = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<div class="btn-spinner"></div>';
+
+        try {
+            const { error } = await window.supabaseClient
+                .from('planejamento_topics')
+                .update({
+                    tittle: data.tittle,
+                    briefing: data.briefing || null,
+                    type_content: data.type_content || null,
+                    script_tp: data.script_tp || null,
+                    caption: data.caption || null
+                })
+                .eq('id', topicId);
+
+            if (error) throw error;
+
+            console.log('[PlanejamentoActions] Tópico atualizado inline:', topicId);
+            await this.reloadCurrentPlanejamento();
+            this.showSuccessToast('Tópico atualizado!');
+        } catch (error) {
+            console.error('[PlanejamentoActions] Erro ao atualizar tópico:', error);
+            alert('Erro ao atualizar tópico: ' + error.message);
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalHTML;
+        }
     }
 
     async saveTopic(planejamentoId, data) {
         try {
-            // Obter próxima ordem
             const maxOrder = Math.max(0, ...this.selectedPlanejamento.topics.map(t => t.order_position || 0));
 
             const { data: newTopic, error } = await window.supabaseClient
@@ -302,36 +367,11 @@ export class PlanejamentoActions {
 
             console.log('[PlanejamentoActions] Tópico criado:', newTopic.id);
             
-            // Recarregar planejamento
             await this.reloadCurrentPlanejamento();
             this.showSuccessToast('Tópico adicionado!');
         } catch (error) {
             console.error('[PlanejamentoActions] Erro ao criar tópico:', error);
             alert('Erro ao criar tópico: ' + error.message);
-        }
-    }
-
-    async updateTopic(topicId, data) {
-        try {
-            const { error } = await window.supabaseClient
-                .from('planejamento_topics')
-                .update({
-                    tittle: data.tittle,
-                    briefing: data.briefing,
-                    type_content: data.type_content,
-                    script_tp: data.script_tp,
-                    caption: data.caption
-                })
-                .eq('id', topicId);
-
-            if (error) throw error;
-
-            console.log('[PlanejamentoActions] Tópico atualizado:', topicId);
-            await this.reloadCurrentPlanejamento();
-            this.showSuccessToast('Tópico atualizado!');
-        } catch (error) {
-            console.error('[PlanejamentoActions] Erro ao atualizar tópico:', error);
-            alert('Erro ao atualizar tópico: ' + error.message);
         }
     }
 
@@ -359,7 +399,7 @@ export class PlanejamentoActions {
         const topics = this.selectedPlanejamento.topics;
         const index = topics.findIndex(t => t.id === topicId);
         
-        if (index <= 0) return; // Já está no topo
+        if (index <= 0) return;
 
         const currentTopic = topics[index];
         const previousTopic = topics[index - 1];
@@ -371,7 +411,7 @@ export class PlanejamentoActions {
         const topics = this.selectedPlanejamento.topics;
         const index = topics.findIndex(t => t.id === topicId);
         
-        if (index < 0 || index >= topics.length - 1) return; // Já está no final
+        if (index < 0 || index >= topics.length - 1) return;
 
         const currentTopic = topics[index];
         const nextTopic = topics[index + 1];
@@ -384,7 +424,6 @@ export class PlanejamentoActions {
             const pos1 = topic1.order_position;
             const pos2 = topic2.order_position;
 
-            // Atualizar no banco
             const { error: error1 } = await window.supabaseClient
                 .from('planejamento_topics')
                 .update({ order_position: pos2 })
@@ -433,14 +472,12 @@ export class PlanejamentoActions {
 
             if (error) throw error;
 
-            // Ordenar tópicos
             data.topics = (data.topics || []).sort((a, b) => 
                 (a.order_position || 0) - (b.order_position || 0)
             );
 
             this.selectedPlanejamento = data;
             
-            // Atualizar na lista também
             const index = this.planejamentos.findIndex(p => p.id === data.id);
             if (index !== -1) {
                 this.planejamentos[index] = data;
