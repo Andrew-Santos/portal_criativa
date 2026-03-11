@@ -15,15 +15,15 @@ const R2 = new S3Client({
 const BUCKET_NAME = 'criativa';
 const R2_PUBLIC_URL = 'https://pub-4371349196374d9dae204ee83a635609.r2.dev';
 
-// Tipos de arquivos permitidos
 const ALLOWED_TYPES = {
     'image/jpeg': '.jpg',
     'image/jpg': '.jpg',
     'image/png': '.png',
     'image/gif': '.gif',
     'image/webp': '.webp',
+    'image/heic': '.heic',     // ← ADICIONADO
+    'image/heif': '.heif',     // ← CORRIGIDO
     'video/mp4': '.mp4',
-    'image/heif',
     'video/quicktime': '.mov',
     'video/x-msvideo': '.avi',
     'video/webm': '.webm'
@@ -493,6 +493,7 @@ module.exports = async (req, res) => {
         ]
     });
 };
+
 
 
 
