@@ -23,6 +23,7 @@ const ALLOWED_TYPES = {
     'image/gif': '.gif',
     'image/webp': '.webp',
     'video/mp4': '.mp4',
+    'image/heif',
     'video/quicktime': '.mov',
     'video/x-msvideo': '.avi',
     'video/webm': '.webm'
@@ -492,6 +493,7 @@ module.exports = async (req, res) => {
         ]
     });
 };
+
 
 
 
