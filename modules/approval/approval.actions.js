@@ -490,48 +490,156 @@ export class ApprovalActions {
     }
 
     async handleDownload(button) {
-        const postId = button.dataset.postId;
-        const post = this.posts.find(p => p.id == postId);
+    const postId = button.dataset.postId;
+    const post = this.posts.find(p => p.id == postId);
 
-        if (!post || !post.post_media || post.post_media.length === 0) {
-            alert('Nenhuma mídia disponível para download.');
-            return;
-        }
+    if (!post || !post.post_media || post.post_media.length === 0) {
+        alert('Nenhuma mídia disponível para download.');
+        return;
+    }
 
-        button.disabled = true;
-        const originalHTML = button.innerHTML;
-        button.innerHTML = '<i class="ph-fill ph-circle-notch" style="animation: spin 0.6s linear infinite;"></i>';
+    button.disabled = true;
+    const originalHTML = button.innerHTML;
 
-        try {
-            const medias = post.post_media.sort((a, b) => (a.order || 0) - (b.order || 0));
+    // Injeta o SVG de progresso circular no botão
+    const setProgress = (percent) => {
+        const radius = 10;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (percent / 100) * circumference;
+        button.innerHTML = `
+            <svg width="28" height="28" viewBox="0 0 28 28" style="transform: rotate(-90deg);">
+                <circle cx="14" cy="14" r="${radius}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2.5"/>
+                <circle cx="14" cy="14" r="${radius}" fill="none" stroke="white" stroke-width="2.5"
+                    stroke-dasharray="${circumference}"
+                    stroke-dashoffset="${offset}"
+                    stroke-linecap="round"
+                    style="transition: stroke-dashoffset 0.15s ease;"/>
+            </svg>
+        `;
+    };
 
-            if (medias.length === 1) {
-                const media = medias[0];
-                const extension = media.type === 'video' ? 'mp4' : 'jpg';
-                const filename = `post_${postId}_media.${extension}`;
-                
-                try {
-                    await this.downloadMediaAsBlob(media.url_media, filename);
-                } catch {
-                    window.open(media.url_media, '_blank');
-                }
-            } else {
-                try {
-                    await this.downloadMultipleMediasAsZip(medias, postId);
-                } catch (error) {
-                    console.error('[ApprovalActions] Erro ao criar ZIP:', error);
-                    medias.forEach(media => window.open(media.url_media, '_blank'));
-                    alert('Não foi possível criar ZIP. As mídias foram abertas em novas abas.');
-                }
+    setProgress(0);
+
+    try {
+        const medias = post.post_media.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        if (medias.length === 1) {
+            const media = medias[0];
+            const extension = media.type === 'video' ? 'mp4' : 'jpg';
+            const filename = `post_${postId}_media.${extension}`;
+            try {
+                await this.downloadMediaWithProgress(media.url_media, filename, setProgress);
+            } catch {
+                window.open(media.url_media, '_blank');
             }
-        } catch (error) {
-            console.error('[ApprovalActions] Erro durante o download:', error);
-            alert('Ocorreu um erro ao tentar baixar a mídia.');
-        } finally {
-            button.disabled = false;
-            button.innerHTML = originalHTML;
+        } else {
+            try {
+                await this.downloadMultipleMediasAsZip(medias, postId, setProgress);
+            } catch (error) {
+                console.error('[ApprovalActions] Erro ao criar ZIP:', error);
+                medias.forEach(media => window.open(media.url_media, '_blank'));
+                alert('Não foi possível criar ZIP. As mídias foram abertas em novas abas.');
+            }
+        }
+    } catch (error) {
+        console.error('[ApprovalActions] Erro durante o download:', error);
+        alert('Ocorreu um erro ao tentar baixar a mídia.');
+    } finally {
+        button.disabled = false;
+        button.innerHTML = originalHTML;
+    }
+}
+
+async downloadMediaWithProgress(url, filename, onProgress) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Falha na rede');
+
+    const contentLength = response.headers.get('Content-Length');
+    const total = contentLength ? parseInt(contentLength, 10) : null;
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let received = 0;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (total) {
+            onProgress(Math.min(99, Math.round((received / total) * 100)));
+        } else {
+            // Sem Content-Length: anima em loop até 90%
+            onProgress(Math.min(90, Math.round((received / 5_000_000) * 90)));
         }
     }
+
+    onProgress(100);
+
+    const blob = new Blob(chunks);
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(objectUrl);
+}
+
+async downloadMultipleMediasAsZip(medias, postId, onProgress) {
+    if (typeof JSZip === 'undefined') throw new Error("JSZip não está definido");
+
+    const zip = new JSZip();
+    const total = medias.length;
+
+    for (let i = 0; i < total; i++) {
+        const media = medias[i];
+        try {
+            const response = await fetch(media.url_media);
+            if (!response.ok) continue;
+
+            const contentLength = response.headers.get('Content-Length');
+            const fileTotal = contentLength ? parseInt(contentLength, 10) : null;
+            const reader = response.body.getReader();
+            const chunks = [];
+            let received = 0;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                received += value.length;
+
+                // Progresso: cada arquivo ocupa sua fatia do total
+                const fileProgress = fileTotal
+                    ? Math.min(1, received / fileTotal)
+                    : Math.min(0.9, received / 5_000_000);
+                const overall = ((i + fileProgress) / total) * 95; // reserva 5% pro zip
+                onProgress(Math.round(overall));
+            }
+
+            const blob = new Blob(chunks);
+            const extension = media.type === 'video' ? 'mp4' : 'png';
+            zip.file(`midia_${String(i + 1).padStart(2, '0')}.${extension}`, blob);
+        } catch (e) {
+            console.warn('[ZIP] Falha ao baixar mídia', i, e);
+        }
+    }
+
+    onProgress(97);
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    onProgress(100);
+
+    const objectUrl = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = `post_${postId}_midias.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(objectUrl);
+}
 
     handleEdit(button) {
         const postId = button.dataset.postId;
